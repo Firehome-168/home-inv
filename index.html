@@ -17,7 +17,7 @@
 :root{
   --bg:#f4f5f2; --card:#ffffff; --ink:#1f2523; --muted:#66706c; --line:#dfe3df;
   --brand:#2f6f5e; --brand-ink:#ffffff; --brand-soft:#e3efe9;
-  --in:#2f6f5e; --out:#b4542d; --warn:#b07a12; --danger:#b3261e;
+  --in:#2f6f5e; --out:#b4542d; --sale:#3b64a8; --warn:#b07a12; --danger:#b3261e;
   --shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05);
   --radius:12px;
 }
@@ -25,14 +25,14 @@
   :root:not([data-theme="light"]){
     --bg:#121614; --card:#1c2220; --ink:#e7ece9; --muted:#9aa5a0; --line:#2e3633;
     --brand:#5fb39a; --brand-ink:#0d1412; --brand-soft:#21332d;
-    --in:#5fb39a; --out:#e08a62; --warn:#e0b24a; --danger:#f2867d;
+    --in:#5fb39a; --out:#e08a62; --sale:#86a9e6; --warn:#e0b24a; --danger:#f2867d;
     --shadow:none;
   }
 }
 :root[data-theme="dark"]{
   --bg:#121614; --card:#1c2220; --ink:#e7ece9; --muted:#9aa5a0; --line:#2e3633;
   --brand:#5fb39a; --brand-ink:#0d1412; --brand-soft:#21332d;
-  --in:#5fb39a; --out:#e08a62; --warn:#e0b24a; --danger:#f2867d;
+  --in:#5fb39a; --out:#e08a62; --sale:#86a9e6; --warn:#e0b24a; --danger:#f2867d;
   --shadow:none;
 }
 *{box-sizing:border-box}
@@ -57,6 +57,7 @@ main{padding:0 16px 16px;max-width:720px;margin:0 auto}
 .btn{border:0;border-radius:10px;padding:11px 14px;font-size:16px;background:var(--brand);color:var(--brand-ink);font-weight:600}
 .btn.ghost{background:var(--brand-soft);color:var(--ink)}
 .btn.out{background:var(--out);color:#fff}
+.btn.sale{background:var(--sale);color:#fff}
 .btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
 .btn:disabled{opacity:.5}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -101,7 +102,7 @@ svg text{fill:var(--muted);font-size:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
 video{width:100%;border-radius:10px;background:#000}
-.in-c{color:var(--in)}.out-c{color:var(--out)}
+.in-c{color:var(--in)}.out-c{color:var(--out)}.sale-c{color:var(--sale)}
 table{width:100%;border-collapse:collapse;font-size:14px}
 td,th{padding:6px 4px;border-bottom:1px solid var(--line)}
 th{color:var(--muted);font-weight:600;text-align:left}
@@ -119,10 +120,12 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2 id="homeMonth">本月支出</h2>
       <div class="big" id="homeTotal">0</div>
       <div id="homeDept" style="margin-top:10px"></div>
+      <div id="homeIncome" class="small" style="margin-top:8px"></div>
     </div>
     <div class="btnrow" style="margin-bottom:12px">
       <button class="btn" data-act="newIn">＋ 購入</button>
       <button class="btn out" data-act="newOut">－ 使用</button>
+      <button class="btn sale" data-act="newSale">$ 銷售</button>
     </div>
     <div id="homeAlerts"></div>
     <div class="card">
@@ -151,17 +154,30 @@ th{color:var(--muted);font-weight:600;text-align:left}
     <button class="btn out" style="width:100%;margin-bottom:12px" data-act="newOut">－ 新增使用</button>
     <div id="outList"></div>
   </section>
+  <section class="view" id="v-sale">
+    <div class="chips" id="saleTabs"></div>
+    <div id="saleRec">
+      <button class="btn sale" style="width:100%;margin-bottom:12px" data-act="newSale">$ 新增銷售 / 分享</button>
+      <div id="saleList"></div>
+    </div>
+    <div id="saleCust" hidden>
+      <input id="custQ" type="search" placeholder="搜尋代碼、姓名、電話" class="search">
+      <div class="chips" id="custChips"></div>
+      <div class="card"><ul class="list" id="custList"></ul></div>
+      <button class="btn sale" style="width:100%" data-act="newCust">＋ 新增客戶</button>
+    </div>
+  </section>
 
   <!-- 分析 -->
   <section class="view" id="v-stats">
     <div class="chips" id="rangeChips"></div>
     <div class="card">
-      <h2>每月支出</h2>
+      <h2>每月支出 / 收入</h2>
       <div id="chart"></div>
       <div class="chips" id="seriesChips" style="margin-top:8px"></div>
     </div>
     <div class="card">
-      <h2>各月部門支出</h2>
+      <h2>各月部門支出 / 銷售收入</h2>
       <div style="overflow-x:auto"><table id="statTable"></table></div>
     </div>
   </section>
@@ -181,8 +197,9 @@ th{color:var(--muted);font-weight:600;text-align:left}
     <div class="card">
       <h2>匯出 Excel (CSV)</h2>
       <div class="btnrow">
-        <button class="btn ghost" id="btnCsvTx">購入/使用紀錄</button>
+        <button class="btn ghost" id="btnCsvTx">購入/使用/銷售紀錄</button>
         <button class="btn ghost" id="btnCsvStock">目前庫存</button>
+        <button class="btn ghost" id="btnCsvCust">客戶名單</button>
       </div>
     </div>
     <div class="card">
@@ -211,7 +228,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center">家用進銷存 v1.0</p>
+    <p class="small muted" style="text-align:center">家用進銷存 v1.2</p>
   </section>
 </main>
 
@@ -220,6 +237,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
   <button data-v="items"><b>▤</b>物品</button>
   <button data-v="in"><b>＋</b>購入</button>
   <button data-v="out"><b>－</b>使用</button>
+  <button data-v="sale"><b>$</b>銷售</button>
   <button data-v="stats"><b>↗</b>分析</button>
 </nav>
 
@@ -249,13 +267,12 @@ const DB = {
   open() {
     // 所有存取都先等資料庫開好 (第一次開啟可能較慢 , 避免太快點擊時資料沒存到)
     return this.ready = this.ready || new Promise((ok, bad) => {
-      const r = indexedDB.open('homeinv', 1);
-      r.onupgradeneeded = () => {
+      const r = indexedDB.open('homeinv', 2);
+      r.onupgradeneeded = () => {   // v2 : 加客戶 custs (舊資料保留)
         const d = r.result;
-        d.createObjectStore('items', { keyPath: 'id', autoIncrement: true });
-        d.createObjectStore('shops', { keyPath: 'id', autoIncrement: true });
-        d.createObjectStore('txns',  { keyPath: 'id', autoIncrement: true });
-        d.createObjectStore('meta',  { keyPath: 'k' });
+        for (const s of ['items', 'shops', 'txns', 'custs'])
+          if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true });
+        if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
       };
       r.onsuccess = () => { this.db = r.result; ok(); };
       r.onerror = () => bad(r.error);
@@ -299,15 +316,33 @@ const DB = {
 };
 
 /* ========== 狀態 ========== */
-const S = { items: [], shops: [], txns: [], meta: {}, view: 'home', itemDept: '', range: 12, series: ['合計'] };
+const S = { items: [], shops: [], txns: [], custs: [], meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
 
 async function loadAll() {
-  [S.items, S.shops, S.txns] = await Promise.all([DB.all('items'), DB.all('shops'), DB.all('txns')]);
+  [S.items, S.shops, S.txns, S.custs] = await Promise.all([DB.all('items'), DB.all('shops'), DB.all('txns'), DB.all('custs')]);
   const m = await DB.all('meta');
   S.meta = Object.fromEntries(m.map(x => [x.k, x.v]));
 }
 async function setMeta(k, v) { S.meta[k] = v; await DB.put('meta', { k, v }); }
 const itemById = id => S.items.find(x => x.id === id);
+const custById = id => S.custs.find(x => x.id === id);
+const custName = t => (custById(t.custId) || {}).name || t.to || '';
+const KINDS = ['會員', '朋友', '家人', '其他'], KCOL = ['#3b64a8', '#2f9c8f', '#c4517a', '#7a7f7c'];
+const kindTag = k => { const i = Math.max(0, KINDS.indexOf(k)); return `<span class="tag" style="background:${KCOL[i]}">${esc(KINDS[i])}</span>`; };
+/* 代碼最長 10 碼 : 有手機就用手機號碼 , 沒有手機用流水號 0001 起 (流水號只看 10 碼以下的代碼) */
+const digits = v => (v || '').replace(/[^0-9]/g, '');
+const isMobile = v => /^09\d{8}$/.test(digits(v));
+const nextCode = () => String(Math.max(0, ...S.custs.map(c => (c.code || '').length < 10 ? parseInt(c.code, 10) || 0 : 0)) + 1).padStart(4, '0');
+const findCust = v => { v = (v || '').trim(); if (!v) return null; const d = digits(v);
+  return S.custs.find(x => x.code === v) || S.custs.find(x => x.name === v) || (d.length >= 8 ? S.custs.find(x => digits(x.phone) === d) : null) || null; };
+/* 銷售對象 -> 客戶 (輸入代碼或姓名 ; 找不到就自動建一筆 , 類別 朋友) */
+async function custFor(name) {
+  name = (name || '').trim(); if (!name) return null;
+  let c = findCust(name);
+  if (!c) { const m = isMobile(name) ? digits(name) : '';   // 輸入手機號碼 = 代碼 + 電話
+    c = { code: m || nextCode(), name, kind: '朋友', phone: m, addr: '', note: '' }; c.id = await DB.put('custs', c); S.custs.push(c); }
+  return c;
+}
 const shopName = id => (S.shops.find(x => x.id === id) || {}).name || '';
 
 /* 庫存 = 購入數量 - 使用數量 ; 平均單價 = 購入金額 / 購入數量 */
@@ -336,7 +371,7 @@ function show(v) {
   S.view = v;
   $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  $('#title').textContent = { home: '家用進銷存', items: '物品', in: '購入', out: '使用', stats: '支出分析', set: '設定' }[v];
+  $('#title').textContent = { home: '家用進銷存', items: '物品', in: '購入', out: '使用', sale: '銷售 / 分享', stats: '收支分析', set: '設定' }[v];
   window.scrollTo(0, 0);
   render();
 }
@@ -347,6 +382,9 @@ document.body.addEventListener('click', e => {
   const act = a.dataset.act, id = Number(a.dataset.id);
   if (act === 'newIn') txnForm('in');
   else if (act === 'newOut') txnForm('out');
+  else if (act === 'newSale') txnForm('sale');
+  else if (act === 'newCust') custForm();
+  else if (act === 'cust') custDetail(id);
   else if (act === 'newItem') itemForm();
   else if (act === 'item') itemDetail(id);
   else if (act === 'txn') txnForm(null, id);
@@ -357,6 +395,7 @@ function render() {
   else if (S.view === 'items') renderItems();
   else if (S.view === 'in') renderTxnList('in');
   else if (S.view === 'out') renderTxnList('out');
+  else if (S.view === 'sale') renderSale();
   else if (S.view === 'stats') renderStats();
   else if (S.view === 'set') renderSet();
 }
@@ -370,6 +409,9 @@ function renderHome() {
     byDept[i] += t.amount; tot += t.amount;
   }
   $('#homeMonth').textContent = rocYM(ym) + ' 支出';
+  const sales = S.txns.filter(t => t.type === 'sale' && t.date.startsWith(ym));
+  const inc = sales.reduce((s, t) => s + (t.amount || 0), 0), share = sales.filter(t => !t.amount).length;
+  $('#homeIncome').innerHTML = sales.length ? `<span class="sale-c">銷售收入 $${fmt(inc)}</span>${share ? ` <span class="muted">· 分享 ${share} 筆</span>` : ''}` : '';
   $('#homeTotal').textContent = '$ ' + fmt(tot);
   const mx = Math.max(...byDept, 1);
   $('#homeDept').innerHTML = byDept.map((v, i) => v ? `<div class="row small" style="margin:4px 0">
@@ -400,12 +442,15 @@ function renderHome() {
 
 function txnRow(t) {
   const it = itemById(t.itemId) || { name: '(已刪除物品)', dept: '其他', unit: '' };
-  const isIn = t.type === 'in';
+  const isIn = t.type === 'in', isSale = t.type === 'sale';
+  const kind = isIn ? '購入' : isSale ? (t.amount ? '銷售' : '分享') : '使用';
+  const who = isIn ? shopName(t.shopId) : isSale ? custName(t) : '';
+  const val = isIn ? '$' + fmt(t.amount) : isSale && t.amount ? '+$' + fmt(t.amount) : '－' + fmtQ(t.qty);
   return `<li class="tap" data-act="txn" data-id="${t.id}">
     <div class="grow"><div class="ttl">${esc(it.name)}</div>
-      <div class="small muted">${roc(t.date)} · ${isIn ? '購入' : '使用'} ${fmtQ(t.qty)}${esc(it.unit || '')}${isIn && t.shopId ? ' · ' + esc(shopName(t.shopId)) : ''}</div></div>
+      <div class="small muted">${roc(t.date)} · ${kind} ${fmtQ(t.qty)}${esc(it.unit || '')}${who ? ' · ' + esc(who) : ''}</div></div>
     ${deptTag(it.dept)}
-    <div class="num ${isIn ? 'in-c' : 'out-c'}" style="min-width:64px">${isIn ? '$' + fmt(t.amount) : '－' + fmtQ(t.qty)}</div></li>`;
+    <div class="num ${isIn ? 'in-c' : isSale ? 'sale-c' : 'out-c'}" style="min-width:64px">${val}</div></li>`;
 }
 
 /* ========== 物品 ========== */
@@ -464,7 +509,7 @@ function itemForm(id, preset, done) {
   };
   if (id) $('#f-del').onclick = async () => {
     const n = S.txns.filter(t => t.itemId === id).length;
-    if (!confirm(`刪除「${it.name}」${n ? `，連同 ${n} 筆購入/使用紀錄` : ''}？`)) return;
+    if (!confirm(`刪除「${it.name}」${n ? `，連同 ${n} 筆紀錄` : ''}？`)) return;
     for (const t of S.txns.filter(t => t.itemId === id)) await DB.del('txns', t.id);
     S.txns = S.txns.filter(t => t.itemId !== id);
     await DB.del('items', id); S.items = S.items.filter(x => x.id !== id);
@@ -486,46 +531,51 @@ function itemDetail(id) {
       ${it.note ? `<div class="small" style="margin-top:4px">${esc(it.note)}</div>` : ''}
     </div>
     <div class="btnrow" style="margin-bottom:12px">
-      <button class="btn" id="d-in">＋ 購入</button>${it.noStock ? '' : '<button class="btn out" id="d-out">－ 使用</button>'}<button class="btn ghost" id="d-edit">修改</button></div>
+      <button class="btn" id="d-in">＋ 購入</button>${it.noStock ? '' : '<button class="btn out" id="d-out">－ 使用</button><button class="btn sale" id="d-sale">$ 銷售</button>'}<button class="btn ghost" id="d-edit">修改</button></div>
     <div class="card"><h2>紀錄 (${hist.length})</h2><ul class="list">${hist.map(txnRow).join('') || '<li class="empty">尚無紀錄</li>'}</ul></div>`);
   $('#d-in').onclick = () => txnForm('in', null, id);
   if ($('#d-out')) $('#d-out').onclick = () => txnForm('out', null, id);
+  if ($('#d-sale')) $('#d-sale').onclick = () => txnForm('sale', null, id);
   $('#d-edit').onclick = () => itemForm(id);
 }
 
 /* ========== 購入 / 使用 表單 ========== */
-function txnForm(type, txnId, itemId) {
+function txnForm(type, txnId, itemId, toName) {
   const t = txnId ? { ...S.txns.find(x => x.id === txnId) } :
-    { type, date: today(), itemId: itemId || null, qty: 1, price: 0, amount: 0, shopId: null, pay: S.meta.lastPay || '現金', expiry: '', note: '' };
+    { type, date: today(), itemId: itemId || null, qty: 1, price: 0, amount: 0, shopId: null, to: toName || '', custId: null, pay: S.meta.lastPay || '現金', expiry: '', note: '' };
   if (!t || !t.type) return;
   type = t.type;
-  const isIn = type === 'in';
+  const isIn = type === 'in', isSale = type === 'sale', hasAmt = isIn || isSale;
+  const tname = isIn ? '購入' : isSale ? '銷售 / 分享' : '使用';
   let cur = t.itemId ? itemById(t.itemId) : null;
   const shopOpts = S.shops.map(s => `<option value="${esc(s.name)}">`).join('');
-  openSheet(`<h3>${txnId ? '修改' : '新增'}${isIn ? '購入' : '使用'}</h3>
+  const toOpts = S.custs.map(c => `<option value="${esc(c.name)}">${esc(c.code + ' ' + (c.kind || ''))}</option>`).join('');
+  openSheet(`<h3>${txnId ? '修改' : '新增'}${tname}</h3>
     <label>物品 *</label>
     <div class="row"><div class="picker grow"><input id="t-item" autocomplete="off" placeholder="輸入品名或條碼" value="${esc(cur ? cur.name : '')}"><div class="pick-list" id="t-pick"></div></div>
       <button class="btn ghost" id="t-scan" type="button">▦</button></div>
     <div class="small muted" id="t-info"></div>
     <div class="two"><div><label>日期</label><input id="t-date" type="date" value="${t.date}"></div>
       <div><label>數量</label><input id="t-qty" type="number" inputmode="decimal" min="0" step="any" value="${t.qty}"></div></div>
-    ${isIn ? `<div class="two"><div><label>單價</label><input id="t-price" type="number" inputmode="decimal" min="0" step="any" value="${t.price || ''}"></div>
-      <div><label>金額</label><input id="t-amt" type="number" inputmode="decimal" min="0" step="any" value="${t.amount || ''}"></div></div>
-    <div class="two"><div><label>店家</label><input id="t-shop" list="shopDL" value="${esc(shopName(t.shopId))}"><datalist id="shopDL">${shopOpts}</datalist></div>
+    ${hasAmt ? `<div class="two"><div><label>單價${isSale ? ' (0 = 分享)' : ''}</label><input id="t-price" type="number" inputmode="decimal" min="0" step="any" value="${t.price || ''}"></div>
+      <div><label>金額</label><input id="t-amt" type="number" inputmode="decimal" min="0" step="any" value="${t.amount || ''}"></div></div>` : ''}
+    ${isSale ? `<div class="two"><div><label>客戶 (代碼或姓名)</label><input id="t-to" list="toDL" value="${esc(custName(t))}" placeholder="會員、朋友"><datalist id="toDL">${toOpts}</datalist><div class="small muted" id="t-cinfo"></div></div>
+      <div><label>收款</label><select id="t-pay">${PAYS.map(p => `<option ${p === t.pay ? 'selected' : ''}>${p}</option>`).join('')}</select></div></div>` : ''}
+    ${isIn ? `<div class="two"><div><label>店家</label><input id="t-shop" list="shopDL" value="${esc(shopName(t.shopId))}" placeholder="自己種的填「自家」"><datalist id="shopDL">${shopOpts}</datalist></div>
       <div><label>付款</label><select id="t-pay">${PAYS.map(p => `<option ${p === t.pay ? 'selected' : ''}>${p}</option>`).join('')}</select></div></div>
     <label>有效期限 (食品、藥品)</label><input id="t-exp" type="date" value="${t.expiry || ''}">` : ''}
     <label>備註</label><input id="t-note" value="${esc(t.note)}">
     <div class="btnrow" style="margin-top:14px">
       ${txnId ? '<button class="btn danger" id="t-del">刪除</button>' : ''}
-      <button class="btn ghost" id="t-cancel">取消</button><button class="btn ${isIn ? '' : 'out'}" id="t-ok">儲存</button></div>`);
+      <button class="btn ghost" id="t-cancel">取消</button><button class="btn ${isIn ? '' : isSale ? 'sale' : 'out'}" id="t-ok">儲存</button></div>`);
 
   const info = () => {
     if (!cur) { $('#t-info').textContent = ''; return; }
     const st = stockOf(cur.id);
     $('#t-info').innerHTML = `${deptTag(cur.dept)} ${cur.noStock ? '不計庫存' : '庫存 ' + fmtQ(st.qty) + esc(cur.unit || '')}${st.avg ? ' · 平均 $' + fmt(st.avg) : ''}`;
-    if (isIn && !txnId && !$('#t-price').value) {   // 帶入上次單價 / 店家
-      const last = S.txns.filter(x => x.itemId === cur.id && x.type === 'in').sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
-      if (last) { $('#t-price').value = last.price || ''; if (!$('#t-shop').value) $('#t-shop').value = shopName(last.shopId); calcAmt(); }
+    if (hasAmt && !txnId && !$('#t-price').value) {   // 帶入上次單價 / 店家
+      const last = S.txns.filter(x => x.itemId === cur.id && x.type === type).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
+      if (last) { $('#t-price').value = last.price || ''; if (isIn && !$('#t-shop').value) $('#t-shop').value = shopName(last.shopId); calcAmt(); }
     }
   };
   const pick = it => { cur = it; $('#t-item').value = it.name; $('#t-pick').classList.remove('on'); info(); $('#t-qty').focus(); };
@@ -558,16 +608,23 @@ function txnForm(type, txnId, itemId) {
   // 新增物品 / 掃碼後回到本表單 , 保留已填內容
   function collect() {
     return { date: $('#t-date').value, qty: $('#t-qty').value, note: $('#t-note').value,
-      price: isIn ? $('#t-price').value : '', amt: isIn ? $('#t-amt').value : '', shop: isIn ? $('#t-shop').value : '',
-      pay: isIn ? $('#t-pay').value : '', exp: isIn ? $('#t-exp').value : '' };
+      price: hasAmt ? $('#t-price').value : '', amt: hasAmt ? $('#t-amt').value : '', shop: isIn ? $('#t-shop').value : '',
+      to: isSale ? $('#t-to').value : '', pay: hasAmt ? $('#t-pay').value : '', exp: isIn ? $('#t-exp').value : '' };
   }
   function reopen(k, it) {
     txnForm(type, txnId, it ? it.id : (cur ? cur.id : null));
     $('#t-date').value = k.date; $('#t-qty').value = k.qty; $('#t-note').value = k.note;
-    if (isIn) { if (k.price) $('#t-price').value = k.price; if (k.amt) $('#t-amt').value = k.amt; if (k.shop) $('#t-shop').value = k.shop; if (k.pay) $('#t-pay').value = k.pay; $('#t-exp').value = k.exp; }
+    if (hasAmt) { if (k.price) $('#t-price').value = k.price; if (k.amt) $('#t-amt').value = k.amt; if (k.pay) $('#t-pay').value = k.pay; }
+    if (isIn) { if (k.shop) $('#t-shop').value = k.shop; $('#t-exp').value = k.exp; }
+    if (isSale && k.to) $('#t-to').value = k.to;
   }
-  function calcAmt() { const q = Number($('#t-qty').value) || 0, p = Number($('#t-price').value) || 0; if (p) $('#t-amt').value = Math.round(q * p * 100) / 100; }
-  if (isIn) {
+  function calcAmt() { const q = Number($('#t-qty').value) || 0, pv = $('#t-price').value, p = Number(pv) || 0; $('#t-amt').value = p ? Math.round(q * p * 100) / 100 : (pv === '' ? '' : 0); }   // 單價改 0 = 分享 , 金額跟著歸 0
+  if (isSale) {
+    const ci = () => { const v = $('#t-to').value.trim(), c = findCust(v);
+      $('#t-cinfo').innerHTML = !v ? '' : c ? `${esc(c.code)} ${esc(c.name)} ${kindTag(c.kind)}` : '新客戶，儲存時自動建檔'; };
+    $('#t-to').oninput = ci; ci();
+  }
+  if (hasAmt) {
     $('#t-price').oninput = calcAmt;
     $('#t-qty').oninput = calcAmt;
     $('#t-amt').oninput = () => { const q = Number($('#t-qty').value) || 0, a = Number($('#t-amt').value) || 0; if (q) $('#t-price').value = Math.round(a / q * 100) / 100; };
@@ -581,10 +638,14 @@ function txnForm(type, txnId, itemId) {
     if (!(qty > 0)) { toast('數量要大於 0'); return; }
     const date = $('#t-date').value || today();
     const rec = Object.assign(txnId ? { ...t } : { type }, { date, itemId: cur.id, qty, note: $('#t-note').value.trim() });
-    if (isIn) {
+    if (hasAmt) {
       rec.amount = Number($('#t-amt').value) || 0;
       rec.price = Number($('#t-price').value) || (qty ? Math.round(rec.amount / qty * 100) / 100 : 0);
-      rec.pay = $('#t-pay').value; rec.expiry = $('#t-exp').value || '';
+      rec.pay = $('#t-pay').value;
+    }
+    if (isSale) { const c = await custFor($('#t-to').value); rec.custId = c ? c.id : null; rec.to = c ? c.name : ''; }
+    if (isIn) {
+      rec.expiry = $('#t-exp').value || '';
       const sn = $('#t-shop').value.trim();
       if (sn) {
         let s = S.shops.find(x => x.name === sn);
@@ -594,11 +655,11 @@ function txnForm(type, txnId, itemId) {
       await setMeta('lastPay', rec.pay);
     } else {
       const avail = stockOf(cur.id).qty + (txnId && t.itemId === cur.id ? t.qty : 0);
-      if (qty > avail && !confirm(`庫存只有 ${fmtQ(avail)}${cur.unit || ''}，仍要登錄使用 ${fmtQ(qty)}？`)) return;
+      if (qty > avail && !confirm(`庫存只有 ${fmtQ(avail)}${cur.unit || ''}，仍要登錄${isSale ? '銷售' : '使用'} ${fmtQ(qty)}？`)) return;
     }
     const newId = await DB.put('txns', rec); rec.id = rec.id ?? newId;
     if (txnId) S.txns[S.txns.findIndex(x => x.id === txnId)] = rec; else S.txns.push(rec);
-    closeSheet(); toast(isIn ? '購入已儲存' : '使用已儲存'); render();
+    closeSheet(); toast(tname + '已儲存'); render();
   };
   if (txnId) $('#t-del').onclick = async () => {
     if (!confirm('刪除這筆紀錄？')) return;
@@ -607,16 +668,104 @@ function txnForm(type, txnId, itemId) {
   };
 }
 
+function renderSale() {
+  $('#saleTabs').innerHTML = [['rec', '銷售紀錄'], ['cust', '客戶 (' + S.custs.length + ')']].map(([k, n]) => `<button class="chip ${S.saleTab === k ? 'on' : ''}" data-t="${k}">${n}</button>`).join('');
+  $('#saleRec').hidden = S.saleTab !== 'rec'; $('#saleCust').hidden = S.saleTab !== 'cust';
+  if (S.saleTab === 'rec') renderTxnList('sale'); else renderCusts();
+}
+$('#saleTabs').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.saleTab = c.dataset.t; renderSale(); } };
+function custStat(id) {
+  let amt = 0, n = 0, share = 0, last = '';
+  for (const t of S.txns) if (t.type === 'sale' && t.custId === id) { n++; amt += t.amount || 0; if (!t.amount) share++; if (t.date > last) last = t.date; }
+  return { amt, n, share, last };
+}
+function renderCusts() {
+  $('#custChips').innerHTML = ['', ...KINDS].map(k => `<button class="chip ${S.custKind === k ? 'on' : ''}" data-k="${k}">${k || '全部'}</button>`).join('');
+  const q = $('#custQ').value.trim().toLowerCase();
+  const arr = S.custs.filter(c => (!S.custKind || c.kind === S.custKind) && (!q || [c.code, c.name, c.phone, c.addr].some(v => (v || '').toLowerCase().includes(q))))
+    .sort((a, b) => (a.code || '').localeCompare(b.code || '') || a.name.localeCompare(b.name, 'zh-Hant'));
+  $('#custList').innerHTML = arr.map(c => { const st = custStat(c.id);
+    return `<li class="tap" data-act="cust" data-id="${c.id}">
+      <div class="grow"><div class="ttl">${esc(c.name)}</div><div class="small muted">${esc([c.code, digits(c.phone) === c.code ? '' : c.phone, st.n ? st.n + ' 筆' : '', st.last ? '最近 ' + roc(st.last) : ''].filter(Boolean).join(' · '))}</div></div>
+      ${kindTag(c.kind)}<div class="num sale-c" style="min-width:64px">${st.amt ? '$' + fmt(st.amt) : ''}</div></li>`; }).join('') || '<li class="empty">還沒有客戶，按下方「＋ 新增客戶」，或銷售時輸入對象會自動建檔</li>';
+}
+$('#custQ').oninput = renderCusts;
+$('#custChips').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.custKind = c.dataset.k; renderCusts(); } };
+
+function custForm(id, done) {
+  const c = id ? custById(id) : { code: '', name: '', kind: '朋友', phone: '', addr: '', note: '' };
+  openSheet(`<h3>${id ? '修改客戶' : '新增客戶'}</h3>
+    <div class="two"><div><label>代碼 (手機號碼)</label><input id="c-code" value="${esc(c.code || '')}" maxlength="10" inputmode="numeric" placeholder="空白=自動編號"></div>
+      <div><label>姓名 *</label><input id="c-name" value="${esc(c.name)}"></div></div>
+    <label>類別</label><div class="chips" id="c-kind">${KINDS.map((k, i) => `<button class="chip ${c.kind === k ? 'on' : ''}" data-k="${k}" style="${c.kind === k ? 'background:' + KCOL[i] + ';border-color:' + KCOL[i] : ''}">${k}</button>`).join('')}</div>
+    <label>電話 / 手機</label><input id="c-phone" type="tel" value="${esc(c.phone)}">
+    <label>地址</label><input id="c-addr" value="${esc(c.addr)}">
+    <label>備註</label><input id="c-note" value="${esc(c.note)}" placeholder="例：喜歡地瓜、每週六來拿">
+    <div class="btnrow" style="margin-top:14px">
+      ${id ? '<button class="btn danger" id="c-del">刪除</button>' : ''}
+      <button class="btn ghost" id="c-cancel">取消</button><button class="btn sale" id="c-ok">儲存</button></div>`);
+  let kind = c.kind || '朋友';
+  $('#c-kind').onclick = e => {
+    const b = e.target.closest('.chip'); if (!b) return; kind = b.dataset.k;
+    $$('#c-kind .chip').forEach((x, i) => { const on = x.dataset.k === kind; x.classList.toggle('on', on); x.style.background = on ? KCOL[i] : ''; x.style.borderColor = on ? KCOL[i] : ''; });
+  };
+  // 輸入手機時 , 代碼還沒填 (或原本就是同一支手機) 就自動帶入
+  let codeAuto = !c.code || c.code === digits(c.phone);
+  $('#c-code').oninput = () => { codeAuto = false; };
+  $('#c-phone').oninput = () => { if (codeAuto) $('#c-code').value = isMobile($('#c-phone').value) ? digits($('#c-phone').value) : (id ? c.code : ''); };
+  $('#c-cancel').onclick = closeSheet;
+  $('#c-ok').onclick = async () => {
+    const name = $('#c-name').value.trim();
+    const phone = $('#c-phone').value.trim();
+    const code = $('#c-code').value.trim() || (isMobile(phone) ? digits(phone) : nextCode());
+    if (!name) { toast('請輸入姓名'); return; }
+    if (S.custs.some(x => x.code === code && x.id !== id)) { toast('代碼已被使用'); return; }
+    if (S.custs.some(x => x.name === name && x.id !== id)) { toast('已有同名客戶'); return; }
+    const rec = Object.assign(id ? { ...c } : {}, { code, name, kind, phone, addr: $('#c-addr').value.trim(), note: $('#c-note').value.trim() });
+    const newId = await DB.put('custs', rec); rec.id = rec.id ?? newId;
+    if (id) S.custs[S.custs.findIndex(x => x.id === id)] = rec; else S.custs.push(rec);
+    closeSheet(); toast('已儲存'); render();
+    if (done) done(rec);
+  };
+  if (id) $('#c-del').onclick = async () => {
+    if (!confirm(`刪除客戶「${c.name}」？(銷售紀錄保留)`)) return;
+    await DB.del('custs', id); S.custs = S.custs.filter(x => x.id !== id);
+    closeSheet(); toast('已刪除'); render();
+  };
+}
+
+function custDetail(id) {
+  const c = custById(id); if (!c) return;
+  const st = custStat(id);
+  const hist = S.txns.filter(t => t.type === 'sale' && t.custId === id).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  openSheet(`<div class="row"><h3 class="grow">${esc(c.name)}</h3>${kindTag(c.kind)}</div>
+    <div class="card">
+      <div class="two">
+        <div><div class="small muted">銷售金額</div><div class="big sale-c">$${fmt(st.amt)}</div></div>
+        <div><div class="small muted">筆數</div><div class="big">${st.n}<span class="small muted">${st.share ? ' (分享 ' + st.share + ')' : ''}</span></div></div>
+      </div>
+      <div class="small muted" style="margin-top:6px">${esc(['代碼 ' + (c.code || ''), c.phone && '電話 ' + c.phone, c.addr && '地址 ' + c.addr].filter(Boolean).join(' · '))}</div>
+      ${c.note ? `<div class="small" style="margin-top:4px">${esc(c.note)}</div>` : ''}
+    </div>
+    <div class="btnrow" style="margin-bottom:12px">
+      <button class="btn sale" id="cd-sale">$ 銷售給${esc(c.name.length > 4 ? '他' : c.name)}</button>
+      ${c.phone ? `<a class="btn ghost" style="text-align:center;text-decoration:none" href="tel:${esc(c.phone.replace(/[^0-9+]/g, ''))}">打電話</a>` : ''}
+      <button class="btn ghost" id="cd-edit">修改</button></div>
+    <div class="card"><h2>紀錄 (${hist.length})</h2><ul class="list">${hist.map(txnRow).join('') || '<li class="empty">尚無紀錄</li>'}</ul></div>`);
+  $('#cd-sale').onclick = () => txnForm('sale', null, null, c.name);
+  $('#cd-edit').onclick = () => custForm(id);
+}
+
 function renderTxnList(type) {
   const arr = S.txns.filter(t => t.type === type).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
   const groups = {};
   for (const t of arr) (groups[t.date.slice(0, 7)] ||= []).push(t);
   const keys = Object.keys(groups).slice(0, 24);
   $('#' + type + 'List').innerHTML = keys.map(k => {
-    const sum = groups[k].reduce((s, t) => s + (type === 'in' ? t.amount : 0), 0);
-    return `<div class="card"><div class="row"><h2 class="grow">${rocYM(k)}</h2>${type === 'in' ? `<span class="num small muted">合計 $${fmt(sum)}</span>` : `<span class="small muted">${groups[k].length} 筆</span>`}</div>
+    const sum = groups[k].reduce((s, t) => s + (t.amount || 0), 0);
+    return `<div class="card"><div class="row"><h2 class="grow">${rocYM(k)}</h2>${type === 'in' ? `<span class="num small muted">合計 $${fmt(sum)}</span>` : type === 'sale' ? `<span class="num small muted">${groups[k].length} 筆 · 收入 $${fmt(sum)}</span>` : `<span class="small muted">${groups[k].length} 筆</span>`}</div>
       <ul class="list">${groups[k].map(txnRow).join('')}</ul></div>`;
-  }).join('') || `<div class="card empty">還沒有${type === 'in' ? '購入' : '使用'}紀錄</div>`;
+  }).join('') || `<div class="card empty">還沒有${{ in: '購入', out: '使用', sale: '銷售 / 分享' }[type]}紀錄</div>`;
 }
 
 /* ========== 分析 : 每月支出折線圖 (時間軸 年月 , Y 軸 金額) ========== */
@@ -638,20 +787,25 @@ function renderStats() {
   $('#rangeChips').innerHTML = [6, 12, 24].map(n => `<button class="chip ${S.range === n ? 'on' : ''}" data-n="${n}">近 ${n} 個月</button>`).join('');
   const months = monthsBack(S.range), rows = monthTable(months);
   const total = months.map((_, i) => rows.reduce((s, r) => s + r[i], 0));
-  const all = ['合計', ...DEPTS];
-  $('#seriesChips').innerHTML = all.map((d, i) => { const on = S.series.includes(d), c = i ? DCOL[i - 1] : 'var(--ink)';
-    return `<button class="chip ${on ? 'on' : ''}" data-s="${d}" style="${on ? `background:${c};border-color:${c};color:${i ? '#fff' : 'var(--bg)'}` : ''}">${d}</button>`; }).join('');
-  const series = S.series.map(d => d === '合計' ? { name: d, color: 'var(--ink)', data: total } : { name: d, color: DCOL[DEPTS.indexOf(d)], data: rows[DEPTS.indexOf(d)] });
+  const idx = Object.fromEntries(months.map((m, i) => [m, i])), income = months.map(() => 0);
+  for (const t of S.txns) if (t.type === 'sale' && t.amount) { const i = idx[t.date.slice(0, 7)]; if (i !== undefined) income[i] += t.amount; }
+  const hasInc = income.some(v => v);
+  const all = ['合計', ...DEPTS, ...(hasInc ? ['收入'] : [])];
+  const colOf = d => d === '合計' ? 'var(--ink)' : d === '收入' ? 'var(--sale)' : DCOL[DEPTS.indexOf(d)];
+  $('#seriesChips').innerHTML = all.map(d => { const on = S.series.includes(d), c = colOf(d);
+    return `<button class="chip ${on ? 'on' : ''}" data-s="${d}" style="${on ? `background:${c};border-color:${c};color:${d === '合計' ? 'var(--bg)' : '#fff'}` : ''}">${d}</button>`; }).join('');
+  const series = S.series.filter(d => all.includes(d)).map(d => ({ name: d, color: colOf(d), data: d === '合計' ? total : d === '收入' ? income : rows[DEPTS.indexOf(d)] }));
   $('#chart').innerHTML = lineChart(months.map(rocYM), series);
 
   // 表格 : 年月 x 部門 (新到舊)
   const used = DEPTS.map((d, i) => rows[i].some(v => v) ? i : -1).filter(i => i >= 0);
-  let h = `<tr><th>年月</th>${used.map(i => `<th class="num">${DEPTS[i]}</th>`).join('')}<th class="num">合計</th></tr>`;
-  for (let m = months.length - 1; m >= 0; m--) if (total[m])
-    h += `<tr><td>${rocYM(months[m])}</td>${used.map(i => `<td class="num">${rows[i][m] ? fmt(rows[i][m]) : ''}</td>`).join('')}<td class="num"><b>${fmt(total[m])}</b></td></tr>`;
-  const gt = total.reduce((a, b) => a + b, 0);
-  if (gt) h += `<tr><th>合計</th>${used.map(i => `<th class="num">${fmt(rows[i].reduce((a, b) => a + b, 0))}</th>`).join('')}<th class="num">${fmt(gt)}</th></tr>`;
-  $('#statTable').innerHTML = gt ? h : '<tr><td class="empty">這段期間沒有購入紀錄</td></tr>';
+  const incTd = v => hasInc ? `<td class="num sale-c">${v ? fmt(v) : ''}</td>` : '';
+  let h = `<tr><th>年月</th>${used.map(i => `<th class="num">${DEPTS[i]}</th>`).join('')}<th class="num">合計</th>${hasInc ? '<th class="num">收入</th>' : ''}</tr>`;
+  for (let m = months.length - 1; m >= 0; m--) if (total[m] || income[m])
+    h += `<tr><td>${rocYM(months[m])}</td>${used.map(i => `<td class="num">${rows[i][m] ? fmt(rows[i][m]) : ''}</td>`).join('')}<td class="num"><b>${fmt(total[m])}</b></td>${incTd(income[m])}</tr>`;
+  const gt = total.reduce((a, b) => a + b, 0), gi = income.reduce((a, b) => a + b, 0);
+  if (gt || gi) h += `<tr><th>合計</th>${used.map(i => `<th class="num">${fmt(rows[i].reduce((a, b) => a + b, 0))}</th>`).join('')}<th class="num">${fmt(gt)}</th>${hasInc ? `<th class="num sale-c">${fmt(gi)}</th>` : ''}</tr>`;
+  $('#statTable').innerHTML = gt || gi ? h : '<tr><td class="empty">這段期間沒有購入紀錄</td></tr>';
 }
 $('#rangeChips').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.range = Number(c.dataset.n); renderStats(); } };
 $('#seriesChips').onclick = e => {
@@ -682,7 +836,7 @@ function lineChart(labels, series) {
 /* ========== 設定 ========== */
 function renderSet() {
   const bk = S.meta.lastBackup;
-  $('#bkInfo').textContent = `物品 ${S.items.length} 筆、紀錄 ${S.txns.length} 筆。` + (bk ? `上次備份：${roc(new Date(bk - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}` : '尚未備份過。');
+  $('#bkInfo').textContent = `物品 ${S.items.length} 筆、客戶 ${S.custs.length} 筆、紀錄 ${S.txns.length} 筆。` + (bk ? `上次備份：${roc(new Date(bk - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}` : '尚未備份過。');
   $('#shopList').innerHTML = S.shops.map(s => `<li><div class="grow">${esc(s.name)}</div><span class="small muted">${S.txns.filter(t => t.shopId === s.id).length} 筆</span>
     <button class="iconbtn" data-shop-ren="${s.id}" aria-label="改名">✎</button><button class="iconbtn" data-shop-del="${s.id}" aria-label="刪除">✕</button></li>`).join('') || '<li class="empty">購入時輸入店家會自動加入</li>';
   $('#themeSel').value = S.meta.theme || '';
@@ -717,7 +871,7 @@ async function saveFile(name, text, mime) {
 }
 const stamp = () => today().replace(/-/g, '');
 $('#btnBackup').onclick = async () => {
-  const data = { app: 'homeinv', version: 1, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns };
+  const data = { app: 'homeinv', version: 2, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs };
   if (await saveFile(`家用進銷存備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
     await setMeta('lastBackup', Date.now()); toast('備份完成'); renderSet();
   }
@@ -729,19 +883,27 @@ $('#fileRestore').onchange = async e => {
   try { d = JSON.parse(await f.text()); } catch { toast('檔案格式錯誤'); return; }
   if (d.app !== 'homeinv' || !Array.isArray(d.items) || !Array.isArray(d.txns)) { toast('這不是家用進銷存的備份檔'); return; }
   if (!confirm(`用備份檔還原？\n物品 ${d.items.length} 筆、紀錄 ${d.txns.length} 筆\n目前手機上的資料會被取代。`)) return;
-  await DB.tx(['items', 'shops', 'txns'], 'readwrite', t => {
-    for (const s of ['items', 'shops', 'txns']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
+  await DB.tx(['items', 'shops', 'txns', 'custs'], 'readwrite', t => {
+    for (const s of ['items', 'shops', 'txns', 'custs']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
   });
-  await loadAll(); toast('還原完成'); show('home');
+  await loadAll(); await migrateCusts(); toast('還原完成'); show('home');
 };
 function csv(rows) { return '﻿' + rows.map(r => r.map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n'); }
 $('#btnCsvTx').onclick = () => {
-  const rows = [['日期', '類別', '部門', '分類', '品名', '數量', '單位', '單價', '金額', '店家', '付款', '有效期限', '備註']];
+  const rows = [['日期', '類別', '部門', '分類', '品名', '數量', '單位', '單價', '金額', '店家/客戶', '付款', '有效期限', '備註']];
   for (const t of [...S.txns].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
     const it = itemById(t.itemId) || {};
-    rows.push([roc(t.date), t.type === 'in' ? '購入' : '使用', it.dept, it.cat, it.name, t.qty, it.unit, t.type === 'in' ? t.price : '', t.type === 'in' ? t.amount : '', shopName(t.shopId), t.pay || '', roc(t.expiry), t.note]);
+    const amt = t.type === 'in' || t.type === 'sale';
+    rows.push([roc(t.date), { in: '購入', out: '使用', sale: t.amount ? '銷售' : '分享' }[t.type], it.dept, it.cat, it.name, t.qty, it.unit, amt ? t.price : '', amt ? t.amount : '', t.type === 'sale' ? custName(t) : shopName(t.shopId), t.pay || '', roc(t.expiry), t.note]);
   }
   saveFile(`家用進銷存紀錄_${stamp()}.csv`, csv(rows), 'text/csv');
+};
+$('#btnCsvCust').onclick = () => {
+  const rows = [['代碼', '姓名', '類別', '電話', '地址', '備註', '銷售筆數', '銷售金額', '最近日期']];
+  for (const c of [...S.custs].sort((a, b) => (a.code || '').localeCompare(b.code || ''))) {
+    const st = custStat(c.id); rows.push([c.code, c.name, c.kind, c.phone, c.addr, c.note, st.n, st.amt, roc(st.last)]);
+  }
+  saveFile(`家用進銷存客戶_${stamp()}.csv`, csv(rows), 'text/csv');
 };
 $('#btnCsvStock').onclick = () => {
   const rows = [['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '存放位置', '安全存量', '條碼']];
@@ -754,7 +916,7 @@ $('#btnCsvStock').onclick = () => {
 $('#btnWipe').onclick = async () => {
   if (!confirm('清除這支手機上的全部資料？')) return;
   if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
-  await DB.tx(['items', 'shops', 'txns', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'meta']) t.objectStore(s).clear(); });
+  await DB.tx(['items', 'shops', 'txns', 'custs', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'custs', 'meta']) t.objectStore(s).clear(); });
   await loadAll(); applyTheme(); toast('已清除'); show('home');
 };
 
@@ -779,9 +941,17 @@ async function scan(cb) {
   } catch { closeSheet(); toast('無法開啟相機'); manual(); }
 }
 
+/* v1.1 的銷售「對象」文字 -> 客戶檔 (只做一次 , 還原舊備份時也會做) */
+async function migrateCusts() {
+  for (const c of [...S.custs].sort((a, b) => a.id - b.id)) if (!c.code) { c.code = nextCode(); await DB.put('custs', c); }
+  for (const t of S.txns) if (t.type === 'sale' && t.to && !t.custId) {
+    const c = await custFor(t.to); t.custId = c.id; await DB.put('txns', t);
+  }
+}
+
 /* ========== 啟動 ========== */
 (async () => {
-  try { await DB.open(); await loadAll(); }
+  try { await DB.open(); await loadAll(); await migrateCusts(); }
   catch (e) { document.body.innerHTML = '<p style="padding:20px">這個瀏覽器無法儲存資料 (可能是私密瀏覽模式)。</p>'; return; }
   applyTheme();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
