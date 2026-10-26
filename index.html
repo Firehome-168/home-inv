@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>家用進銷存</title>
+<meta name="description" content="家庭用品購入、使用、庫存與支出分析">
+<meta name="theme-color" content="#2f6f5e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="家用進銷存">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+:root{
+  --bg:#f4f5f2; --card:#ffffff; --ink:#1f2523; --muted:#66706c; --line:#dfe3df;
+  --brand:#2f6f5e; --brand-ink:#ffffff; --brand-soft:#e3efe9;
+  --in:#2f6f5e; --out:#b4542d; --warn:#b07a12; --danger:#b3261e;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05);
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121614; --card:#1c2220; --ink:#e7ece9; --muted:#9aa5a0; --line:#2e3633;
+    --brand:#5fb39a; --brand-ink:#0d1412; --brand-soft:#21332d;
+    --in:#5fb39a; --out:#e08a62; --warn:#e0b24a; --danger:#f2867d;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121614; --card:#1c2220; --ink:#e7ece9; --muted:#9aa5a0; --line:#2e3633;
+  --brand:#5fb39a; --brand-ink:#0d1412; --brand-soft:#21332d;
+  --in:#5fb39a; --out:#e08a62; --warn:#e0b24a; --danger:#f2867d;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.45 system-ui,-apple-system,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  -webkit-text-size-adjust:100%}
+body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;background:var(--bg);
+  padding:calc(10px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:8px}
+header h1{font-size:20px;margin:0;flex:1}
+.iconbtn{border:0;background:transparent;color:var(--ink);font-size:22px;width:40px;height:40px;border-radius:20px}
+.iconbtn:active{background:var(--line)}
+main{padding:0 16px 16px;max-width:720px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin:0 0 12px}
+.card h2{font-size:15px;margin:0 0 8px;color:var(--muted);font-weight:600}
+.big{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}.small{font-size:13px}
+.row{display:flex;align-items:center;gap:8px}
+.grow{flex:1;min-width:0}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.btn{border:0;border-radius:10px;padding:11px 14px;font-size:16px;background:var(--brand);color:var(--brand-ink);font-weight:600}
+.btn.ghost{background:var(--brand-soft);color:var(--ink)}
+.btn.out{background:var(--out);color:#fff}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
+.btn:disabled{opacity:.5}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btnrow .btn{flex:1}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.list li:last-child{border-bottom:0}
+.list li.tap:active{background:var(--line)}
+.ttl{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;color:#fff;white-space:nowrap}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:5px 12px;font-size:14px;white-space:nowrap}
+.chip.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 11px;min-height:44px}
+textarea{min-height:64px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.search{margin:0 0 8px}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:transparent;color:var(--muted);padding:8px 0 6px;font-size:12px}
+nav button b{display:block;font-size:20px;font-weight:400;line-height:1.2}
+nav button.on{color:var(--brand);font-weight:700}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20;display:none}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg);border-radius:16px 16px 0 0;
+  max-height:92vh;overflow:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom));display:none;max-width:720px;margin:0 auto}
+.sheet.on,.sheet-bg.on{display:block}
+.sheet h3{margin:4px 0 6px;font-size:18px}
+.picker{position:relative}
+.pick-list{position:absolute;left:0;right:0;top:100%;z-index:3;background:var(--card);border:1px solid var(--line);border-radius:10px;
+  max-height:240px;overflow:auto;box-shadow:var(--shadow);display:none}
+.pick-list.on{display:block}
+.pick-list div{padding:10px 12px;border-bottom:1px solid var(--line)}
+.pick-list div:active{background:var(--line)}
+.bar{height:10px;border-radius:5px;background:var(--brand)}
+.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:9px 16px;border-radius:20px;z-index:30;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+.alert{border-left:4px solid var(--warn)}
+.empty{color:var(--muted);text-align:center;padding:18px 0}
+svg text{fill:var(--muted);font-size:10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;margin-top:6px}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+video{width:100%;border-radius:10px;background:#000}
+.in-c{color:var(--in)}.out-c{color:var(--out)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;text-align:left}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">家用進銷存</h1>
+  <button class="iconbtn" id="btnSet" aria-label="設定">⚙</button>
+</header>
+<main>
+  <!-- 首頁 -->
+  <section class="view on" id="v-home">
+    <div class="card">
+      <h2 id="homeMonth">本月支出</h2>
+      <div class="big" id="homeTotal">0</div>
+      <div id="homeDept" style="margin-top:10px"></div>
+    </div>
+    <div class="btnrow" style="margin-bottom:12px">
+      <button class="btn" data-act="newIn">＋ 購入</button>
+      <button class="btn out" data-act="newOut">－ 使用</button>
+    </div>
+    <div id="homeAlerts"></div>
+    <div class="card">
+      <h2>最近紀錄</h2>
+      <ul class="list" id="homeRecent"></ul>
+    </div>
+  </section>
+
+  <!-- 物品 -->
+  <section class="view" id="v-items">
+    <div class="row search">
+      <input id="itemQ" type="search" placeholder="搜尋品名、條碼、位置" class="grow">
+      <button class="btn ghost" id="btnScanItem" aria-label="掃條碼">▦</button>
+    </div>
+    <div class="chips" id="itemChips"></div>
+    <div class="card"><ul class="list" id="itemList"></ul></div>
+    <button class="btn" style="width:100%" data-act="newItem">＋ 新增物品</button>
+  </section>
+
+  <!-- 購入 / 使用 -->
+  <section class="view" id="v-in">
+    <button class="btn" style="width:100%;margin-bottom:12px" data-act="newIn">＋ 新增購入</button>
+    <div id="inList"></div>
+  </section>
+  <section class="view" id="v-out">
+    <button class="btn out" style="width:100%;margin-bottom:12px" data-act="newOut">－ 新增使用</button>
+    <div id="outList"></div>
+  </section>
+
+  <!-- 分析 -->
+  <section class="view" id="v-stats">
+    <div class="chips" id="rangeChips"></div>
+    <div class="card">
+      <h2>每月支出</h2>
+      <div id="chart"></div>
+      <div class="chips" id="seriesChips" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h2>各月部門支出</h2>
+      <div style="overflow-x:auto"><table id="statTable"></table></div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="view" id="v-set">
+    <div class="card">
+      <h2>資料備份</h2>
+      <p class="small muted" id="bkInfo"></p>
+      <div class="btnrow">
+        <button class="btn" id="btnBackup">備份匯出</button>
+        <button class="btn ghost" id="btnRestore">從備份還原</button>
+      </div>
+      <input type="file" id="fileRestore" accept=".json,application/json" hidden>
+      <p class="small muted">資料只存在這支手機。換手機、清除瀏覽器資料或刪除 APP 都會遺失，請定期備份，並把備份檔存到雲端硬碟或電腦。</p>
+    </div>
+    <div class="card">
+      <h2>匯出 Excel (CSV)</h2>
+      <div class="btnrow">
+        <button class="btn ghost" id="btnCsvTx">購入/使用紀錄</button>
+        <button class="btn ghost" id="btnCsvStock">目前庫存</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>店家</h2>
+      <ul class="list" id="shopList"></ul>
+      <div class="row" style="margin-top:8px">
+        <input id="shopNew" placeholder="新增店家名稱" class="grow">
+        <button class="btn" id="btnShopAdd">新增</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>顯示</h2>
+      <select id="themeSel">
+        <option value="">跟隨手機設定</option>
+        <option value="light">淺色</option>
+        <option value="dark">深色</option>
+      </select>
+    </div>
+    <div class="card">
+      <h2>安裝到主畫面</h2>
+      <p class="small">iPhone / iPad：用 Safari 開啟本網址，按「分享」→「加入主畫面」。<br>
+      Android：用 Chrome 開啟，按右上「⋮」→「安裝應用程式」或「加到主畫面」。</p>
+      <p class="small muted" id="storeInfo"></p>
+    </div>
+    <div class="card">
+      <h2>清除資料</h2>
+      <button class="btn danger" id="btnWipe">清除全部資料</button>
+    </div>
+    <p class="small muted" style="text-align:center">家用進銷存 v1.0</p>
+  </section>
+</main>
+
+<nav id="nav">
+  <button data-v="home" class="on"><b>⌂</b>首頁</button>
+  <button data-v="items"><b>▤</b>物品</button>
+  <button data-v="in"><b>＋</b>購入</button>
+  <button data-v="out"><b>－</b>使用</button>
+  <button data-v="stats"><b>↗</b>分析</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ========== 常數 ========== */
+const DEPTS = ['食','衣','住','行','育樂','健康','教育','其他'];
+const DCOL  = ['#c0752b','#7b5ea7','#3d7ea6','#4f8a3c','#c4517a','#2f9c8f','#a68a1f','#7a7f7c'];
+const PAYS  = ['現金','信用卡','行動支付','轉帳','其他'];
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Math.round(n || 0).toLocaleString('zh-TW');
+const fmtQ = n => (Math.round((n || 0) * 100) / 100).toLocaleString('zh-TW');
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const roc = iso => iso ? (Number(iso.slice(0, 4)) - 1911) + '.' + iso.slice(5, 7) + '.' + iso.slice(8, 10) : '';
+const rocYM = ym => (Number(ym.slice(0, 4)) - 1911) + '.' + ym.slice(5, 7);
+const deptTag = d => { const i = Math.max(0, DEPTS.indexOf(d)); return `<span class="tag" style="background:${DCOL[i]}">${esc(DEPTS[i])}</span>`; };
+
+/* ========== IndexedDB ========== */
+const DB = {
+  db: null, ready: null,
+  open() {
+    // 所有存取都先等資料庫開好 (第一次開啟可能較慢 , 避免太快點擊時資料沒存到)
+    return this.ready = this.ready || new Promise((ok, bad) => {
+      const r = indexedDB.open('homeinv', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore('items', { keyPath: 'id', autoIncrement: true });
+        d.createObjectStore('shops', { keyPath: 'id', autoIncrement: true });
+        d.createObjectStore('txns',  { keyPath: 'id', autoIncrement: true });
+        d.createObjectStore('meta',  { keyPath: 'k' });
+      };
+      r.onsuccess = () => { this.db = r.result; ok(); };
+      r.onerror = () => bad(r.error);
+    });
+  },
+  async tx(store, mode, fn) {
+    await this.open();
+    return new Promise((ok, bad) => {
+      const t = this.db.transaction(store, mode);
+      let res;
+      t.oncomplete = () => ok(res);
+      t.onerror = () => bad(t.error);
+      t.onabort = () => bad(t.error);
+      res = fn(t);
+    });
+  },
+  async all(store) {
+    await this.open();
+    return new Promise((ok, bad) => {
+      const r = this.db.transaction(store).objectStore(store).getAll();
+      r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error);
+    });
+  },
+  async put(store, obj) {
+    await this.open();
+    return new Promise((ok, bad) => {
+      const t = this.db.transaction(store, 'readwrite');
+      const r = t.objectStore(store).put(obj);
+      r.onsuccess = () => { obj.id = obj.id ?? r.result; };
+      t.oncomplete = () => ok(r.result); t.onerror = () => bad(t.error);
+    });
+  },
+  async del(store, id) {
+    await this.open();
+    return new Promise((ok, bad) => {
+      const t = this.db.transaction(store, 'readwrite');
+      t.objectStore(store).delete(id);
+      t.oncomplete = () => ok(); t.onerror = () => bad(t.error);
+    });
+  }
+};
+
+/* ========== 狀態 ========== */
+const S = { items: [], shops: [], txns: [], meta: {}, view: 'home', itemDept: '', range: 12, series: ['合計'] };
+
+async function loadAll() {
+  [S.items, S.shops, S.txns] = await Promise.all([DB.all('items'), DB.all('shops'), DB.all('txns')]);
+  const m = await DB.all('meta');
+  S.meta = Object.fromEntries(m.map(x => [x.k, x.v]));
+}
+async function setMeta(k, v) { S.meta[k] = v; await DB.put('meta', { k, v }); }
+const itemById = id => S.items.find(x => x.id === id);
+const shopName = id => (S.shops.find(x => x.id === id) || {}).name || '';
+
+/* 庫存 = 購入數量 - 使用數量 ; 平均單價 = 購入金額 / 購入數量 */
+function stockOf(id) {
+  let q = 0, inQ = 0, inA = 0;
+  for (const t of S.txns) if (t.itemId === id) {
+    if (t.type === 'in') { q += t.qty; inQ += t.qty; inA += t.amount; } else q -= t.qty;
+  }
+  return { qty: Math.round(q * 100) / 100, avg: inQ ? inA / inQ : 0 };
+}
+/* 最近一筆有到期日的購入 (物品還有庫存才提醒) */
+function nearestExpiry(id) {
+  let e = '';
+  for (const t of S.txns) if (t.itemId === id && t.type === 'in' && t.expiry && (!e || t.expiry < e)) e = t.expiry;
+  return e;
+}
+function daysTo(iso) { return Math.round((new Date(iso) - new Date(today())) / 86400000); }
+
+/* ========== 共用 UI ========== */
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2200); }
+function openSheet(html) { $('#sheet').innerHTML = html; $('#sheet').classList.add('on'); $('#sheetBg').classList.add('on'); $('#sheet').scrollTop = 0; }
+function closeSheet() { $('#sheet').classList.remove('on'); $('#sheetBg').classList.remove('on'); stopScan(); }
+$('#sheetBg').onclick = closeSheet;
+
+function show(v) {
+  S.view = v;
+  $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('#title').textContent = { home: '家用進銷存', items: '物品', in: '購入', out: '使用', stats: '支出分析', set: '設定' }[v];
+  window.scrollTo(0, 0);
+  render();
+}
+$('#nav').onclick = e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); };
+$('#btnSet').onclick = () => show('set');
+document.body.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act, id = Number(a.dataset.id);
+  if (act === 'newIn') txnForm('in');
+  else if (act === 'newOut') txnForm('out');
+  else if (act === 'newItem') itemForm();
+  else if (act === 'item') itemDetail(id);
+  else if (act === 'txn') txnForm(null, id);
+});
+
+function render() {
+  if (S.view === 'home') renderHome();
+  else if (S.view === 'items') renderItems();
+  else if (S.view === 'in') renderTxnList('in');
+  else if (S.view === 'out') renderTxnList('out');
+  else if (S.view === 'stats') renderStats();
+  else if (S.view === 'set') renderSet();
+}
+
+/* ========== 首頁 ========== */
+function renderHome() {
+  const ym = today().slice(0, 7);
+  const byDept = DEPTS.map(() => 0); let tot = 0;
+  for (const t of S.txns) if (t.type === 'in' && t.date.startsWith(ym)) {
+    const it = itemById(t.itemId); const i = Math.max(0, DEPTS.indexOf(it ? it.dept : '其他'));
+    byDept[i] += t.amount; tot += t.amount;
+  }
+  $('#homeMonth').textContent = rocYM(ym) + ' 支出';
+  $('#homeTotal').textContent = '$ ' + fmt(tot);
+  const mx = Math.max(...byDept, 1);
+  $('#homeDept').innerHTML = byDept.map((v, i) => v ? `<div class="row small" style="margin:4px 0">
+      <span style="width:36px">${DEPTS[i]}</span>
+      <div class="grow"><div class="bar" style="width:${Math.max(3, v / mx * 100)}%;background:${DCOL[i]}"></div></div>
+      <span class="num" style="width:76px">${fmt(v)}</span></div>` : '').join('') || '<div class="small muted">本月尚無購入紀錄</div>';
+
+  // 提醒 : 低於安全存量 / 30 天內到期 / 備份
+  const low = [], exp = [];
+  for (const it of S.items) {
+    if (it.noStock) continue;
+    const s = stockOf(it.id).qty;
+    if (it.safe > 0 && s <= it.safe) low.push(`${esc(it.name)} 剩 ${fmtQ(s)}${esc(it.unit || '')}`);
+    const e = nearestExpiry(it.id);
+    if (e && s > 0) { const d = daysTo(e); if (d <= 30) exp.push(`${esc(it.name)} ${d < 0 ? '已過期' : d + ' 天後到期'} (${roc(e)})`); }
+  }
+  const bk = S.meta.lastBackup, bkDays = bk ? Math.floor((Date.now() - bk) / 86400000) : null;
+  let h = '';
+  if (low.length) h += `<div class="card alert"><h2>快用完了 (${low.length})</h2><div class="small">${low.join('<br>')}</div></div>`;
+  if (exp.length) h += `<div class="card alert"><h2>即將到期 (${exp.length})</h2><div class="small">${exp.join('<br>')}</div></div>`;
+  if (S.txns.length && (bkDays === null || bkDays >= 14))
+    h += `<div class="card alert"><h2>提醒備份</h2><div class="small">${bkDays === null ? '還沒備份過' : bkDays + ' 天沒備份了'}，資料只存在這支手機。<br><a href="#" onclick="show('set');return false">前往備份</a></div></div>`;
+  $('#homeAlerts').innerHTML = h;
+
+  const rec = [...S.txns].sort((a, b) => (b.date + b.id).localeCompare(a.date + a.id) || b.id - a.id).slice(0, 6);
+  $('#homeRecent').innerHTML = rec.map(txnRow).join('') || '<li class="empty">還沒有紀錄，先按「＋ 購入」開始</li>';
+}
+
+function txnRow(t) {
+  const it = itemById(t.itemId) || { name: '(已刪除物品)', dept: '其他', unit: '' };
+  const isIn = t.type === 'in';
+  return `<li class="tap" data-act="txn" data-id="${t.id}">
+    <div class="grow"><div class="ttl">${esc(it.name)}</div>
+      <div class="small muted">${roc(t.date)} · ${isIn ? '購入' : '使用'} ${fmtQ(t.qty)}${esc(it.unit || '')}${isIn && t.shopId ? ' · ' + esc(shopName(t.shopId)) : ''}</div></div>
+    ${deptTag(it.dept)}
+    <div class="num ${isIn ? 'in-c' : 'out-c'}" style="min-width:64px">${isIn ? '$' + fmt(t.amount) : '－' + fmtQ(t.qty)}</div></li>`;
+}
+
+/* ========== 物品 ========== */
+function renderItems() {
+  $('#itemChips').innerHTML = ['', ...DEPTS].map(d => `<button class="chip ${S.itemDept === d ? 'on' : ''}" data-d="${d}">${d || '全部'}</button>`).join('');
+  const q = $('#itemQ').value.trim().toLowerCase();
+  const arr = S.items.filter(it => (!S.itemDept || it.dept === S.itemDept) &&
+      (!q || [it.name, it.barcode, it.loc, it.cat].some(v => (v || '').toLowerCase().includes(q))))
+    .sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant'));
+  $('#itemList').innerHTML = arr.map(it => {
+    const s = stockOf(it.id).qty, low = !it.noStock && it.safe > 0 && s <= it.safe;
+    return `<li class="tap" data-act="item" data-id="${it.id}">
+      <div class="grow"><div class="ttl">${esc(it.name)}</div>
+        ${it.cat || it.loc ? `<div class="small muted">${esc([it.cat, it.loc].filter(Boolean).join(' · '))}</div>` : ''}</div>
+      ${deptTag(it.dept)}
+      <div class="num" style="min-width:58px;${low ? 'color:var(--warn);font-weight:700' : ''}">${it.noStock ? '<span class="small muted">不計庫存</span>' : fmtQ(s) + '<span class="small muted">' + esc(it.unit || '') + '</span>'}</div></li>`;
+  }).join('') || '<li class="empty">沒有物品</li>';
+}
+$('#itemQ').oninput = renderItems;
+$('#itemChips').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.itemDept = c.dataset.d; renderItems(); } };
+$('#btnScanItem').onclick = () => scan(code => { $('#itemQ').value = code; renderItems(); });
+
+function itemForm(id, preset, done) {
+  const it = id ? itemById(id) : Object.assign({ name: '', dept: '其他', cat: '', unit: '個', barcode: '', loc: '', safe: 0, noStock: false, note: '' }, preset || {});
+  openSheet(`<h3>${id ? '修改物品' : '新增物品'}</h3>
+    <label>品名 *</label><input id="f-name" value="${esc(it.name)}">
+    <label>部門 *</label><div class="chips" id="f-dept">${DEPTS.map((d, i) => `<button class="chip ${it.dept === d ? 'on' : ''}" data-d="${d}" style="${it.dept === d ? 'background:' + DCOL[i] + ';border-color:' + DCOL[i] : ''}">${d}</button>`).join('')}</div>
+    <div class="two"><div><label>分類</label><input id="f-cat" value="${esc(it.cat)}" placeholder="例：乾貨、清潔"></div>
+      <div><label>單位</label><input id="f-unit" value="${esc(it.unit)}" placeholder="個、包、瓶"></div></div>
+    <label>條碼</label><div class="row"><input id="f-bar" class="grow" value="${esc(it.barcode)}" inputmode="numeric"><button class="btn ghost" id="f-scan" type="button">▦</button></div>
+    <div class="two"><div><label>存放位置</label><input id="f-loc" value="${esc(it.loc)}" placeholder="例：廚房上櫃"></div>
+      <div><label>安全存量</label><input id="f-safe" type="number" inputmode="decimal" min="0" value="${it.safe || ''}" placeholder="少於就提醒"></div></div>
+    <label class="row" style="color:var(--ink);margin-top:12px"><input id="f-nostock" type="checkbox" style="width:22px;min-height:22px" ${it.noStock ? 'checked' : ''}> 不計庫存 (例：餐費、車資、學費，只記支出)</label>
+    <label>備註</label><input id="f-note" value="${esc(it.note)}">
+    <div class="btnrow" style="margin-top:14px">
+      ${id ? '<button class="btn danger" id="f-del">刪除</button>' : ''}
+      <button class="btn ghost" id="f-cancel">取消</button><button class="btn" id="f-ok">儲存</button></div>`);
+  let dept = it.dept;
+  $('#f-dept').onclick = e => {
+    const c = e.target.closest('.chip'); if (!c) return; dept = c.dataset.d;
+    $$('#f-dept .chip').forEach((x, i) => { const on = x.dataset.d === dept; x.classList.toggle('on', on); x.style.background = on ? DCOL[i] : ''; x.style.borderColor = on ? DCOL[i] : ''; });
+  };
+  $('#f-scan').onclick = () => scan(code => { $('#f-bar').value = code; });
+  $('#f-cancel').onclick = closeSheet;
+  $('#f-ok').onclick = async () => {
+    const name = $('#f-name').value.trim();
+    if (!name) { toast('請輸入品名'); return; }
+    const bar = $('#f-bar').value.trim();
+    if (bar && S.items.some(x => x.barcode === bar && x.id !== id)) { toast('這個條碼已經用在其他物品'); return; }
+    const rec = Object.assign(id ? { ...it } : {}, { name, dept, cat: $('#f-cat').value.trim(), unit: $('#f-unit').value.trim(),
+      barcode: bar, loc: $('#f-loc').value.trim(), safe: Number($('#f-safe').value) || 0, noStock: $('#f-nostock').checked, note: $('#f-note').value.trim() });
+    const newId = await DB.put('items', rec); rec.id = rec.id ?? newId;
+    if (id) S.items[S.items.findIndex(x => x.id === id)] = rec; else S.items.push(rec);
+    closeSheet(); toast('已儲存'); render();
+    if (done) done(rec);
+  };
+  if (id) $('#f-del').onclick = async () => {
+    const n = S.txns.filter(t => t.itemId === id).length;
+    if (!confirm(`刪除「${it.name}」${n ? `，連同 ${n} 筆購入/使用紀錄` : ''}？`)) return;
+    for (const t of S.txns.filter(t => t.itemId === id)) await DB.del('txns', t.id);
+    S.txns = S.txns.filter(t => t.itemId !== id);
+    await DB.del('items', id); S.items = S.items.filter(x => x.id !== id);
+    closeSheet(); toast('已刪除'); render();
+  };
+}
+
+function itemDetail(id) {
+  const it = itemById(id); if (!it) return;
+  const st = stockOf(id), e = nearestExpiry(id);
+  const hist = S.txns.filter(t => t.itemId === id).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  openSheet(`<div class="row"><h3 class="grow">${esc(it.name)}</h3>${deptTag(it.dept)}</div>
+    <div class="card">
+      <div class="two">
+        <div><div class="small muted">目前庫存</div><div class="big">${it.noStock ? '—' : fmtQ(st.qty)}<span class="small muted"> ${esc(it.unit || '')}</span></div></div>
+        <div><div class="small muted">平均單價</div><div class="big">${st.avg ? '$' + fmt(st.avg) : '—'}</div></div>
+      </div>
+      <div class="small muted" style="margin-top:6px">${esc([it.cat && '分類 ' + it.cat, it.loc && '位置 ' + it.loc, it.safe && '安全存量 ' + it.safe, it.barcode && '條碼 ' + it.barcode, e && '最近到期 ' + roc(e)].filter(Boolean).join(' · '))}</div>
+      ${it.note ? `<div class="small" style="margin-top:4px">${esc(it.note)}</div>` : ''}
+    </div>
+    <div class="btnrow" style="margin-bottom:12px">
+      <button class="btn" id="d-in">＋ 購入</button>${it.noStock ? '' : '<button class="btn out" id="d-out">－ 使用</button>'}<button class="btn ghost" id="d-edit">修改</button></div>
+    <div class="card"><h2>紀錄 (${hist.length})</h2><ul class="list">${hist.map(txnRow).join('') || '<li class="empty">尚無紀錄</li>'}</ul></div>`);
+  $('#d-in').onclick = () => txnForm('in', null, id);
+  if ($('#d-out')) $('#d-out').onclick = () => txnForm('out', null, id);
+  $('#d-edit').onclick = () => itemForm(id);
+}
+
+/* ========== 購入 / 使用 表單 ========== */
+function txnForm(type, txnId, itemId) {
+  const t = txnId ? { ...S.txns.find(x => x.id === txnId) } :
+    { type, date: today(), itemId: itemId || null, qty: 1, price: 0, amount: 0, shopId: null, pay: S.meta.lastPay || '現金', expiry: '', note: '' };
+  if (!t || !t.type) return;
+  type = t.type;
+  const isIn = type === 'in';
+  let cur = t.itemId ? itemById(t.itemId) : null;
+  const shopOpts = S.shops.map(s => `<option value="${esc(s.name)}">`).join('');
+  openSheet(`<h3>${txnId ? '修改' : '新增'}${isIn ? '購入' : '使用'}</h3>
+    <label>物品 *</label>
+    <div class="row"><div class="picker grow"><input id="t-item" autocomplete="off" placeholder="輸入品名或條碼" value="${esc(cur ? cur.name : '')}"><div class="pick-list" id="t-pick"></div></div>
+      <button class="btn ghost" id="t-scan" type="button">▦</button></div>
+    <div class="small muted" id="t-info"></div>
+    <div class="two"><div><label>日期</label><input id="t-date" type="date" value="${t.date}"></div>
+      <div><label>數量</label><input id="t-qty" type="number" inputmode="decimal" min="0" step="any" value="${t.qty}"></div></div>
+    ${isIn ? `<div class="two"><div><label>單價</label><input id="t-price" type="number" inputmode="decimal" min="0" step="any" value="${t.price || ''}"></div>
+      <div><label>金額</label><input id="t-amt" type="number" inputmode="decimal" min="0" step="any" value="${t.amount || ''}"></div></div>
+    <div class="two"><div><label>店家</label><input id="t-shop" list="shopDL" value="${esc(shopName(t.shopId))}"><datalist id="shopDL">${shopOpts}</datalist></div>
+      <div><label>付款</label><select id="t-pay">${PAYS.map(p => `<option ${p === t.pay ? 'selected' : ''}>${p}</option>`).join('')}</select></div></div>
+    <label>有效期限 (食品、藥品)</label><input id="t-exp" type="date" value="${t.expiry || ''}">` : ''}
+    <label>備註</label><input id="t-note" value="${esc(t.note)}">
+    <div class="btnrow" style="margin-top:14px">
+      ${txnId ? '<button class="btn danger" id="t-del">刪除</button>' : ''}
+      <button class="btn ghost" id="t-cancel">取消</button><button class="btn ${isIn ? '' : 'out'}" id="t-ok">儲存</button></div>`);
+
+  const info = () => {
+    if (!cur) { $('#t-info').textContent = ''; return; }
+    const st = stockOf(cur.id);
+    $('#t-info').innerHTML = `${deptTag(cur.dept)} ${cur.noStock ? '不計庫存' : '庫存 ' + fmtQ(st.qty) + esc(cur.unit || '')}${st.avg ? ' · 平均 $' + fmt(st.avg) : ''}`;
+    if (isIn && !txnId && !$('#t-price').value) {   // 帶入上次單價 / 店家
+      const last = S.txns.filter(x => x.itemId === cur.id && x.type === 'in').sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
+      if (last) { $('#t-price').value = last.price || ''; if (!$('#t-shop').value) $('#t-shop').value = shopName(last.shopId); calcAmt(); }
+    }
+  };
+  const pick = it => { cur = it; $('#t-item').value = it.name; $('#t-pick').classList.remove('on'); info(); $('#t-qty').focus(); };
+  const list = () => {
+    const q = $('#t-item').value.trim().toLowerCase();
+    let arr = S.items.filter(it => !q || it.name.toLowerCase().includes(q) || (it.barcode || '') === q);
+    if (!isIn) arr = arr.filter(it => !it.noStock);
+    arr = arr.slice(0, 30);
+    $('#t-pick').innerHTML = arr.map(it => `<div data-id="${it.id}">${deptTag(it.dept)} ${esc(it.name)} <span class="small muted">${it.noStock ? '' : '庫存 ' + fmtQ(stockOf(it.id).qty)}</span></div>`).join('') +
+      (q && isIn ? `<div data-new="1">＋ 新增物品「${esc($('#t-item').value.trim())}」</div>` : '') ||
+      '<div class="muted">找不到物品</div>';
+    $('#t-pick').classList.add('on');
+  };
+  $('#t-item').oninput = () => { cur = null; info(); list(); };
+  $('#t-item').onfocus = list;
+  $('#t-pick').onclick = e => {
+    const d = e.target.closest('div[data-id],div[data-new]'); if (!d) return;
+    if (d.dataset.new) { const keep = collect(); itemForm(null, { name: $('#t-item').value.trim() }, rec => { reopen(keep, rec); }); return; }
+    pick(itemById(Number(d.dataset.id)));
+  };
+  $('#t-scan').onclick = () => {
+    const keep = collect();
+    scan(code => {
+      const it = S.items.find(x => x.barcode === code);
+      if (it) { reopen(keep, it); return; }
+      if (isIn) { if (confirm(`條碼 ${code} 尚未建檔，要新增物品嗎？`)) itemForm(null, { barcode: code }, rec => reopen(keep, rec)); else reopen(keep, null); }
+      else { toast('找不到這個條碼的物品'); reopen(keep, null); }
+    });
+  };
+  // 新增物品 / 掃碼後回到本表單 , 保留已填內容
+  function collect() {
+    return { date: $('#t-date').value, qty: $('#t-qty').value, note: $('#t-note').value,
+      price: isIn ? $('#t-price').value : '', amt: isIn ? $('#t-amt').value : '', shop: isIn ? $('#t-shop').value : '',
+      pay: isIn ? $('#t-pay').value : '', exp: isIn ? $('#t-exp').value : '' };
+  }
+  function reopen(k, it) {
+    txnForm(type, txnId, it ? it.id : (cur ? cur.id : null));
+    $('#t-date').value = k.date; $('#t-qty').value = k.qty; $('#t-note').value = k.note;
+    if (isIn) { if (k.price) $('#t-price').value = k.price; if (k.amt) $('#t-amt').value = k.amt; if (k.shop) $('#t-shop').value = k.shop; if (k.pay) $('#t-pay').value = k.pay; $('#t-exp').value = k.exp; }
+  }
+  function calcAmt() { const q = Number($('#t-qty').value) || 0, p = Number($('#t-price').value) || 0; if (p) $('#t-amt').value = Math.round(q * p * 100) / 100; }
+  if (isIn) {
+    $('#t-price').oninput = calcAmt;
+    $('#t-qty').oninput = calcAmt;
+    $('#t-amt').oninput = () => { const q = Number($('#t-qty').value) || 0, a = Number($('#t-amt').value) || 0; if (q) $('#t-price').value = Math.round(a / q * 100) / 100; };
+  }
+  document.addEventListener('click', function off(e) { if (!e.target.closest('.picker')) { const p = $('#t-pick'); if (p) p.classList.remove('on'); else document.removeEventListener('click', off); } });
+  $('#t-cancel').onclick = closeSheet;
+  info();
+  $('#t-ok').onclick = async () => {
+    if (!cur) { toast('請選擇物品'); return; }
+    const qty = Number($('#t-qty').value);
+    if (!(qty > 0)) { toast('數量要大於 0'); return; }
+    const date = $('#t-date').value || today();
+    const rec = Object.assign(txnId ? { ...t } : { type }, { date, itemId: cur.id, qty, note: $('#t-note').value.trim() });
+    if (isIn) {
+      rec.amount = Number($('#t-amt').value) || 0;
+      rec.price = Number($('#t-price').value) || (qty ? Math.round(rec.amount / qty * 100) / 100 : 0);
+      rec.pay = $('#t-pay').value; rec.expiry = $('#t-exp').value || '';
+      const sn = $('#t-shop').value.trim();
+      if (sn) {
+        let s = S.shops.find(x => x.name === sn);
+        if (!s) { s = { name: sn }; s.id = await DB.put('shops', s); S.shops.push(s); }
+        rec.shopId = s.id;
+      } else rec.shopId = null;
+      await setMeta('lastPay', rec.pay);
+    } else {
+      const avail = stockOf(cur.id).qty + (txnId && t.itemId === cur.id ? t.qty : 0);
+      if (qty > avail && !confirm(`庫存只有 ${fmtQ(avail)}${cur.unit || ''}，仍要登錄使用 ${fmtQ(qty)}？`)) return;
+    }
+    const newId = await DB.put('txns', rec); rec.id = rec.id ?? newId;
+    if (txnId) S.txns[S.txns.findIndex(x => x.id === txnId)] = rec; else S.txns.push(rec);
+    closeSheet(); toast(isIn ? '購入已儲存' : '使用已儲存'); render();
+  };
+  if (txnId) $('#t-del').onclick = async () => {
+    if (!confirm('刪除這筆紀錄？')) return;
+    await DB.del('txns', txnId); S.txns = S.txns.filter(x => x.id !== txnId);
+    closeSheet(); toast('已刪除'); render();
+  };
+}
+
+function renderTxnList(type) {
+  const arr = S.txns.filter(t => t.type === type).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  const groups = {};
+  for (const t of arr) (groups[t.date.slice(0, 7)] ||= []).push(t);
+  const keys = Object.keys(groups).slice(0, 24);
+  $('#' + type + 'List').innerHTML = keys.map(k => {
+    const sum = groups[k].reduce((s, t) => s + (type === 'in' ? t.amount : 0), 0);
+    return `<div class="card"><div class="row"><h2 class="grow">${rocYM(k)}</h2>${type === 'in' ? `<span class="num small muted">合計 $${fmt(sum)}</span>` : `<span class="small muted">${groups[k].length} 筆</span>`}</div>
+      <ul class="list">${groups[k].map(txnRow).join('')}</ul></div>`;
+  }).join('') || `<div class="card empty">還沒有${type === 'in' ? '購入' : '使用'}紀錄</div>`;
+}
+
+/* ========== 分析 : 每月支出折線圖 (時間軸 年月 , Y 軸 金額) ========== */
+function monthsBack(n) {
+  const d = new Date(); d.setDate(1); const out = [];
+  for (let i = n - 1; i >= 0; i--) { const x = new Date(d.getFullYear(), d.getMonth() - i, 1); out.push(x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0')); }
+  return out;
+}
+function monthTable(months) {
+  const idx = Object.fromEntries(months.map((m, i) => [m, i]));
+  const rows = DEPTS.map(() => months.map(() => 0));
+  for (const t of S.txns) if (t.type === 'in') {
+    const i = idx[t.date.slice(0, 7)]; if (i === undefined) continue;
+    const it = itemById(t.itemId); rows[Math.max(0, DEPTS.indexOf(it ? it.dept : '其他'))][i] += t.amount;
+  }
+  return rows;
+}
+function renderStats() {
+  $('#rangeChips').innerHTML = [6, 12, 24].map(n => `<button class="chip ${S.range === n ? 'on' : ''}" data-n="${n}">近 ${n} 個月</button>`).join('');
+  const months = monthsBack(S.range), rows = monthTable(months);
+  const total = months.map((_, i) => rows.reduce((s, r) => s + r[i], 0));
+  const all = ['合計', ...DEPTS];
+  $('#seriesChips').innerHTML = all.map((d, i) => { const on = S.series.includes(d), c = i ? DCOL[i - 1] : 'var(--ink)';
+    return `<button class="chip ${on ? 'on' : ''}" data-s="${d}" style="${on ? `background:${c};border-color:${c};color:${i ? '#fff' : 'var(--bg)'}` : ''}">${d}</button>`; }).join('');
+  const series = S.series.map(d => d === '合計' ? { name: d, color: 'var(--ink)', data: total } : { name: d, color: DCOL[DEPTS.indexOf(d)], data: rows[DEPTS.indexOf(d)] });
+  $('#chart').innerHTML = lineChart(months.map(rocYM), series);
+
+  // 表格 : 年月 x 部門 (新到舊)
+  const used = DEPTS.map((d, i) => rows[i].some(v => v) ? i : -1).filter(i => i >= 0);
+  let h = `<tr><th>年月</th>${used.map(i => `<th class="num">${DEPTS[i]}</th>`).join('')}<th class="num">合計</th></tr>`;
+  for (let m = months.length - 1; m >= 0; m--) if (total[m])
+    h += `<tr><td>${rocYM(months[m])}</td>${used.map(i => `<td class="num">${rows[i][m] ? fmt(rows[i][m]) : ''}</td>`).join('')}<td class="num"><b>${fmt(total[m])}</b></td></tr>`;
+  const gt = total.reduce((a, b) => a + b, 0);
+  if (gt) h += `<tr><th>合計</th>${used.map(i => `<th class="num">${fmt(rows[i].reduce((a, b) => a + b, 0))}</th>`).join('')}<th class="num">${fmt(gt)}</th></tr>`;
+  $('#statTable').innerHTML = gt ? h : '<tr><td class="empty">這段期間沒有購入紀錄</td></tr>';
+}
+$('#rangeChips').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.range = Number(c.dataset.n); renderStats(); } };
+$('#seriesChips').onclick = e => {
+  const c = e.target.closest('.chip'); if (!c) return; const s = c.dataset.s;
+  S.series = S.series.includes(s) ? S.series.filter(x => x !== s) : [...S.series, s];
+  if (!S.series.length) S.series = ['合計'];
+  renderStats();
+};
+function niceMax(v) { if (v <= 0) return 100; const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+function lineChart(labels, series) {
+  const W = 340, H = 210, L = 46, R = 22, T = 10, B = 28, n = labels.length;
+  const mx = niceMax(Math.max(1, ...series.flatMap(s => s.data)));
+  const x = i => L + (n === 1 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1)), y = v => T + (H - T - B) * (1 - v / mx);
+  let g = '';
+  for (let k = 0; k <= 4; k++) { const v = mx * k / 4, yy = y(v);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${L - 4}" y="${yy + 3}" text-anchor="end">${v >= 10000 ? (v / 10000) + '萬' : fmt(v)}</text>`; }
+  // 年月標籤從最後一個月往前等距取 , 最新月份一定顯示且不重疊
+  const step = Math.ceil(n / 6);
+  for (let i = n - 1; i >= 0; i -= step) g += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${labels[i]}</text>`;
+  for (const s of series) {
+    g += `<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" points="${s.data.map((v, i) => x(i) + ',' + y(v)).join(' ')}"/>`;
+    s.data.forEach((v, i) => { if (v) g += `<circle cx="${x(i)}" cy="${y(v)}" r="2.5" fill="${s.color}"><title>${labels[i]} ${s.name} $${fmt(v)}</title></circle>`; });
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="每月支出折線圖">${g}</svg>
+    <div class="legend">${series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>`;
+}
+
+/* ========== 設定 ========== */
+function renderSet() {
+  const bk = S.meta.lastBackup;
+  $('#bkInfo').textContent = `物品 ${S.items.length} 筆、紀錄 ${S.txns.length} 筆。` + (bk ? `上次備份：${roc(new Date(bk - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}` : '尚未備份過。');
+  $('#shopList').innerHTML = S.shops.map(s => `<li><div class="grow">${esc(s.name)}</div><span class="small muted">${S.txns.filter(t => t.shopId === s.id).length} 筆</span>
+    <button class="iconbtn" data-shop-ren="${s.id}" aria-label="改名">✎</button><button class="iconbtn" data-shop-del="${s.id}" aria-label="刪除">✕</button></li>`).join('') || '<li class="empty">購入時輸入店家會自動加入</li>';
+  $('#themeSel').value = S.meta.theme || '';
+  if (navigator.storage && navigator.storage.persisted)
+    navigator.storage.persisted().then(p => { $('#storeInfo').textContent = p ? '資料已設為永久保存。' : '瀏覽器尚未保證永久保存，安裝到主畫面後較不會被清除。'; });
+}
+$('#shopList').onclick = async e => {
+  const r = e.target.closest('[data-shop-ren]'), d = e.target.closest('[data-shop-del]');
+  if (r) { const s = S.shops.find(x => x.id === Number(r.dataset.shopRen)); const nm = prompt('店家名稱', s.name); if (nm && nm.trim()) { s.name = nm.trim(); await DB.put('shops', s); renderSet(); } }
+  if (d) { const id = Number(d.dataset.shopDel); if (!confirm('刪除這個店家？(購入紀錄保留，只是不再顯示店家)')) return;
+    await DB.del('shops', id); S.shops = S.shops.filter(x => x.id !== id); renderSet(); }
+};
+$('#btnShopAdd').onclick = async () => {
+  const nm = $('#shopNew').value.trim(); if (!nm) return;
+  if (S.shops.some(s => s.name === nm)) { toast('已有這個店家'); return; }
+  const s = { name: nm }; s.id = await DB.put('shops', s); S.shops.push(s); $('#shopNew').value = ''; renderSet();
+};
+$('#themeSel').onchange = async () => { await setMeta('theme', $('#themeSel').value); applyTheme(); };
+function applyTheme() { const t = S.meta.theme; if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+
+async function saveFile(name, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const file = new File([blob], name, { type: mime });
+  // iPhone : 用分享選單存到「檔案」或雲端硬碟
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return true; }
+    catch (e) { if (e.name === 'AbortError') return false; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  return true;
+}
+const stamp = () => today().replace(/-/g, '');
+$('#btnBackup').onclick = async () => {
+  const data = { app: 'homeinv', version: 1, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns };
+  if (await saveFile(`家用進銷存備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
+    await setMeta('lastBackup', Date.now()); toast('備份完成'); renderSet();
+  }
+};
+$('#btnRestore').onclick = () => $('#fileRestore').click();
+$('#fileRestore').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let d;
+  try { d = JSON.parse(await f.text()); } catch { toast('檔案格式錯誤'); return; }
+  if (d.app !== 'homeinv' || !Array.isArray(d.items) || !Array.isArray(d.txns)) { toast('這不是家用進銷存的備份檔'); return; }
+  if (!confirm(`用備份檔還原？\n物品 ${d.items.length} 筆、紀錄 ${d.txns.length} 筆\n目前手機上的資料會被取代。`)) return;
+  await DB.tx(['items', 'shops', 'txns'], 'readwrite', t => {
+    for (const s of ['items', 'shops', 'txns']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
+  });
+  await loadAll(); toast('還原完成'); show('home');
+};
+function csv(rows) { return '﻿' + rows.map(r => r.map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n'); }
+$('#btnCsvTx').onclick = () => {
+  const rows = [['日期', '類別', '部門', '分類', '品名', '數量', '單位', '單價', '金額', '店家', '付款', '有效期限', '備註']];
+  for (const t of [...S.txns].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
+    const it = itemById(t.itemId) || {};
+    rows.push([roc(t.date), t.type === 'in' ? '購入' : '使用', it.dept, it.cat, it.name, t.qty, it.unit, t.type === 'in' ? t.price : '', t.type === 'in' ? t.amount : '', shopName(t.shopId), t.pay || '', roc(t.expiry), t.note]);
+  }
+  saveFile(`家用進銷存紀錄_${stamp()}.csv`, csv(rows), 'text/csv');
+};
+$('#btnCsvStock').onclick = () => {
+  const rows = [['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '存放位置', '安全存量', '條碼']];
+  for (const it of [...S.items].sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept))) {
+    if (it.noStock) continue; const s = stockOf(it.id);
+    rows.push([it.dept, it.cat, it.name, s.qty, it.unit, Math.round(s.avg * 100) / 100, Math.round(s.qty * s.avg), it.loc, it.safe || '', it.barcode]);
+  }
+  saveFile(`家用進銷存庫存_${stamp()}.csv`, csv(rows), 'text/csv');
+};
+$('#btnWipe').onclick = async () => {
+  if (!confirm('清除這支手機上的全部資料？')) return;
+  if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
+  await DB.tx(['items', 'shops', 'txns', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'meta']) t.objectStore(s).clear(); });
+  await loadAll(); applyTheme(); toast('已清除'); show('home');
+};
+
+/* ========== 掃條碼 (Android Chrome 支援 BarcodeDetector ; 不支援時改手動輸入) ========== */
+let scanStream = null, scanTimer = null;
+function stopScan() { if (scanTimer) clearInterval(scanTimer); scanTimer = null; if (scanStream) scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+async function scan(cb) {
+  const manual = () => { const c = prompt('輸入條碼'); if (c && c.trim()) cb(c.trim()); };
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices) { closeSheet(); toast('這支手機的瀏覽器不支援相機掃碼，請手動輸入'); manual(); return; }
+  let det;
+  try { det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'] }); } catch { manual(); return; }
+  openSheet(`<h3>掃條碼</h3><video id="scanV" playsinline muted></video>
+    <div class="btnrow" style="margin-top:10px"><button class="btn ghost" id="scanMan">手動輸入</button><button class="btn ghost" id="scanX">取消</button></div>`);
+  $('#scanX').onclick = closeSheet;
+  $('#scanMan').onclick = () => { closeSheet(); manual(); };
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const v = $('#scanV'); v.srcObject = scanStream; await v.play();
+    scanTimer = setInterval(async () => {
+      try { const r = await det.detect(v); if (r.length) { const code = r[0].rawValue; closeSheet(); if (navigator.vibrate) navigator.vibrate(60); cb(code); } } catch { }
+    }, 250);
+  } catch { closeSheet(); toast('無法開啟相機'); manual(); }
+}
+
+/* ========== 啟動 ========== */
+(async () => {
+  try { await DB.open(); await loadAll(); }
+  catch (e) { document.body.innerHTML = '<p style="padding:20px">這個瀏覽器無法儲存資料 (可能是私密瀏覽模式)。</p>'; return; }
+  applyTheme();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  render();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
