@@ -102,6 +102,39 @@ svg text{fill:var(--muted);font-size:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
 video{width:100%;border-radius:10px;background:#000}
+/* 萬年行事曆 (首頁頂部) */
+#cal{padding:0;overflow:hidden}
+#cal-hdr{background:var(--brand);color:var(--brand-ink);display:flex;align-items:center;gap:6px;padding:8px;user-select:none}
+#cal-hdr .title{flex:1;text-align:center;font-size:19px;font-weight:700;letter-spacing:1px;cursor:pointer}
+#cal-hdr .nav{background:rgba(255,255,255,.2);border:0;color:inherit;width:36px;height:36px;border-radius:18px;font-size:20px;line-height:1}
+#cal-today{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.45);color:inherit;padding:4px 12px;border-radius:12px;font-size:13px;white-space:nowrap}
+#cal-wk{display:grid;grid-template-columns:repeat(7,1fr);background:var(--brand-soft)}
+#cal-wk div{text-align:center;padding:4px 0;font-size:13px;font-weight:700;color:var(--muted)}
+#cal-wk .sat,#cal .c-cell.sat .c-day,#cal .c-cell.sat .c-lunar{color:var(--sale)}
+#cal-wk .sun,#cal .c-cell.sun .c-day,#cal .c-cell.sun .c-lunar,#cal .c-cell.hol .c-day{color:var(--danger)}
+#cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--line)}
+#cal .c-cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:3px 1px 2px;min-height:50px;position:relative;cursor:pointer}
+#cal .c-cell:nth-child(7n){border-right:0}
+#cal .c-cell.c-empty{cursor:default;background:var(--bg)}
+#cal .c-cell.today{background:#fff4b3;color:#1f2523}
+#cal .c-cell.sel{outline:2px solid var(--sale);outline-offset:-2px;z-index:1}
+#cal .c-cell.today.sel{outline-color:#e08a00}
+#cal .c-day{font-size:19px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+#cal .c-lunar{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;max-width:100%}
+#cal .c-hol{font-size:9px;color:var(--danger);line-height:1}
+#cal .c-term{width:4px;height:4px;background:var(--in);border-radius:2px;margin-top:1px}
+#cal .c-note{width:6px;height:6px;background:var(--warn);border-radius:3px;position:absolute;top:3px;right:3px}
+#cal .c-cell.today .c-lunar{color:#66706c}
+#cal-info{padding:10px 12px;background:var(--brand-soft)}
+#cal-info .d{font-size:17px;font-weight:700;margin-bottom:2px}
+#cal-info .r{font-size:13px;line-height:1.6}
+#cal-info .yi{color:var(--in)}#cal-info .ji{color:var(--danger)}#cal-info .tm{color:var(--in);font-weight:700}
+#cal-info .note{background:var(--card);border-left:3px solid var(--warn);padding:4px 8px;border-radius:4px;margin-top:6px;font-size:14px;white-space:pre-wrap;word-break:break-all}
+#cal-info .sbtn{border:0;border-radius:14px;padding:5px 14px;font-size:13px;background:var(--brand);color:var(--brand-ink)}
+#cal-info .sbtn.gray{background:var(--muted);color:var(--card)}
+#cal-ed{display:none;margin-top:6px}
+#cal-ym select{margin-bottom:8px}
+@media(max-width:360px){#cal .c-day{font-size:16px}#cal .c-cell{min-height:44px}}
 .in-c{color:var(--in)}.out-c{color:var(--out)}.sale-c{color:var(--sale)}
 table{width:100%;border-collapse:collapse;font-size:14px}
 td,th{padding:6px 4px;border-bottom:1px solid var(--line)}
@@ -116,6 +149,38 @@ th{color:var(--muted);font-weight:600;text-align:left}
 <main>
   <!-- 首頁 -->
   <section class="view on" id="v-home">
+    <div class="card" id="cal">
+      <div id="cal-hdr">
+        <button class="nav" id="cal-prev" aria-label="上個月">&#8249;</button>
+        <div class="title" id="cal-title"></div>
+        <button id="cal-today">今天</button>
+        <button class="nav" id="cal-next" aria-label="下個月">&#8250;</button>
+      </div>
+      <div id="cal-wk"><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div class="sat">六</div><div class="sun">日</div></div>
+      <div id="cal-grid"></div>
+      <div id="cal-info">
+        <div class="d" id="cal-date"></div>
+        <div class="r" id="cal-gz"></div>
+        <div class="r" id="cal-lunar"></div>
+        <div class="r" id="cal-term"></div>
+        <div class="r" id="cal-yiji"></div>
+        <div class="row" style="margin-top:6px">
+          <button class="sbtn" id="cal-btn-note">記事 ✏</button>
+          <span id="cal-hol" class="grow" style="color:var(--danger);font-size:14px;font-weight:700"></span>
+          <button class="sbtn gray" id="cal-exp">匯出記事</button>
+          <button class="sbtn gray" id="cal-imp">匯入記事</button>
+          <input type="file" id="cal-file" accept=".json" hidden>
+        </div>
+        <div id="cal-note"></div>
+        <div id="cal-ed">
+          <textarea id="cal-ta" placeholder="輸入備忘記事..."></textarea>
+          <div class="row" style="justify-content:flex-end;margin-top:6px">
+            <button class="sbtn gray" id="cal-cancel">取消</button>
+            <button class="sbtn" id="cal-save">儲存</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="card">
       <h2 id="homeMonth">本月支出</h2>
       <div class="big" id="homeTotal">0</div>
@@ -246,7 +311,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center">家用進銷存 v1.3</p>
+    <p class="small muted" style="text-align:center">家用進銷存 v1.4</p>
   </section>
 </main>
 
@@ -1163,6 +1228,335 @@ async function migrateAccts() {
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+<script>
+// 萬年行事曆 (首頁頂部) : 西元年顯示 , 記事存 localStorage cal_note_YYYYMMDD
+(function(){
+"use strict";
+const LUNAR_DB = [
+/* 1950 */["19500217",0,[30,30,30,30,30,29,29,29,29,29,29,29]],
+/* 1951 */["19510206",0,[30,30,30,30,30,30,30,30,29,29,29,29]],
+/* 1952 */["19520127",5,[29,29,29,30,30,30,30,30,30,30,30,30,29]],
+/* 1953 */["19530214",0,[29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 1954 */["19540203",0,[29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 1955 */["19550124",3,[30,29,29,29,29,29,29,29,30,30,30,30,30]],
+/* 1956 */["19560212",0,[30,30,29,29,29,29,29,29,30,30,30,30]],
+/* 1957 */["19570131",8,[30,30,30,29,29,29,29,29,29,29,30,30,30]],
+/* 1958 */["19580218",0,[30,30,30,30,29,29,29,29,29,29,30,30]],
+/* 1959 */["19590208",0,[30,30,30,30,30,30,29,29,29,29,29,29]],
+/* 1960 */["19600128",6,[30,29,30,29,30,30,29,30,30,29,29,30,29]],
+/* 1961 */["19610215",0,[29,29,29,30,30,30,30,30,30,30,30,29]],
+/* 1962 */["19620205",0,[29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 1963 */["19630125",4,[30,29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 1964 */["19640213",0,[30,29,29,29,29,29,29,29,30,30,30,30]],
+/* 1965 */["19650202",0,[30,30,29,29,29,29,29,29,29,30,30,30]],
+/* 1966 */["19660121",3,[30,30,30,30,29,29,29,29,29,29,30,30,30]],
+/* 1967 */["19670209",0,[30,30,30,30,29,29,29,29,29,29,29,30]],
+/* 1968 */["19680130",7,[30,30,30,30,30,30,30,29,29,29,29,29,29]],
+/* 1969 */["19690217",0,[30,30,30,30,30,30,30,30,30,29,29,29]],
+/* 1970 */["19700206",0,[29,29,29,29,30,30,30,30,30,30,30,30]],
+/* 1971 */["19710127",5,[29,29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 1972 */["19720215",0,[29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 1973 */["19730203",0,[30,29,29,29,29,29,29,29,30,30,30,30]],
+/* 1974 */["19740123",4,[30,30,30,29,29,29,29,29,29,30,30,30,30]],
+/* 1975 */["19750211",0,[30,30,30,29,29,29,29,29,29,29,30,30]],
+/* 1976 */["19760131",8,[30,30,30,30,30,29,29,29,29,29,29,30,30]],
+/* 1977 */["19770218",0,[30,30,30,30,30,30,29,29,29,29,29,29]],
+/* 1978 */["19780207",0,[29,30,30,30,30,30,30,30,30,30,29,29]],
+/* 1979 */["19790128",6,[29,29,29,29,29,30,30,30,30,30,30,30,29]],
+/* 1980 */["19800216",0,[29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 1981 */["19810205",0,[30,29,29,29,29,29,29,30,30,30,30,30]],
+/* 1982 */["19820125",4,[30,30,29,29,29,29,29,29,29,30,30,30,30]],
+/* 1983 */["19830213",0,[30,30,29,29,29,29,29,29,29,30,30,30]],
+/* 1984 */["19840202",10,[30,30,30,30,29,29,29,29,29,29,30,30,30]],
+/* 1985 */["19850220",0,[30,30,30,30,29,29,29,29,29,29,29,30]],
+/* 1986 */["19860209",0,[30,30,30,30,30,30,30,29,29,29,29,29]],
+/* 1987 */["19870129",6,[29,29,30,30,30,30,30,30,30,30,29,29,29]],
+/* 1988 */["19880217",0,[29,29,29,29,30,30,30,30,30,30,30,30]],
+/* 1989 */["19890206",0,[29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 1990 */["19900127",5,[30,29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 1991 */["19910215",0,[30,29,29,29,29,29,29,29,30,30,30,30]],
+/* 1992 */["19920204",0,[30,30,30,29,29,29,29,29,29,30,30,30]],
+/* 1993 */["19930123",3,[30,30,30,30,29,29,29,29,29,29,29,30,30]],
+/* 1994 */["19940210",0,[30,30,30,30,30,29,29,29,29,29,29,29]],
+/* 1995 */["19950131",8,[30,30,30,30,30,30,30,30,29,29,29,29,29]],
+/* 1996 */["19960219",0,[29,30,30,30,30,30,30,30,30,30,29,29]],
+/* 1997 */["19970207",0,[29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 1998 */["19980128",5,[29,29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 1999 */["19990216",0,[30,29,29,29,29,29,29,30,30,30,30,30]],
+/* 2000 */["20000205",0,[30,30,29,29,29,29,29,29,30,30,30,30]],
+/* 2001 */["20010124",4,[30,30,30,29,29,29,29,29,29,29,30,30,30]],
+/* 2002 */["20020212",0,[30,30,30,30,29,29,29,29,29,29,30,30]],
+/* 2003 */["20030201",0,[30,30,30,30,30,30,29,29,29,29,29,29]],
+/* 2004 */["20040122",2,[30,30,30,30,30,30,30,30,30,29,29,29,29]],
+/* 2005 */["20050209",0,[29,29,30,30,30,30,30,30,30,30,30,29]],
+/* 2006 */["20060129",7,[29,29,29,29,29,30,30,30,30,30,30,30,30]],
+/* 2007 */["20070218",0,[29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 2008 */["20080207",0,[30,29,29,29,29,29,29,30,30,30,30,30]],
+/* 2009 */["20090126",5,[30,30,29,29,29,29,29,29,29,30,30,30,30]],
+/* 2010 */["20100214",0,[30,30,30,29,29,29,29,29,29,30,30,30]],
+/* 2011 */["20110203",0,[30,30,30,30,29,29,29,29,29,29,29,30]],
+/* 2012 */["20120123",4,[30,30,30,30,30,30,29,29,29,29,29,29,29]],
+/* 2013 */["20130210",0,[30,30,30,30,30,30,30,30,30,29,29,29]],
+/* 2014 */["20140131",9,[29,29,29,30,30,30,30,30,30,30,30,29,29]],
+/* 2015 */["20150219",0,[29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 2016 */["20160208",0,[29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 2017 */["20170128",6,[30,29,29,29,29,29,29,29,30,30,30,30,30]],
+/* 2018 */["20180216",0,[30,30,29,29,29,29,29,29,30,30,30,30]],
+/* 2019 */["20190205",0,[30,30,30,29,29,29,29,29,29,29,30,30]],
+/* 2020 */["20200125",4,[30,30,30,30,30,29,29,29,29,29,29,30,30]],
+/* 2021 */["20210212",0,[30,30,30,30,30,30,29,29,29,29,29,29]],
+/* 2022 */["20220201",0,[29,30,30,30,30,30,30,30,30,30,29,29]],
+/* 2023 */["20230122",2,[29,29,29,29,30,30,30,30,30,30,30,30,29]],
+/* 2024 */["20240210",0,[29,29,29,29,29,30,30,30,30,30,30,30]],
+/* 2025 */["20250129",6,[30,29,29,29,29,29,29,30,30,30,30,30,30]],
+/* 2026 */["20260217",0,[30,29,30,29,29,30,29,29,30,30,30,29]],
+/* 2027 */["20270207",0,[29,30,29,30,29,29,30,29,29,30,30,29]],
+/* 2028 */["20280126",5,[30,30,30,29,30,29,30,29,29,29,30,30,29]],
+/* 2029 */["20290213",0,[30,30,29,30,29,30,29,30,29,29,30,29]],
+/* 2030 */["20300202",0,[30,30,30,29,30,29,30,29,30,29,30,29]],
+/* 2031 */["20310123",3,[29,30,30,29,30,29,30,30,29,30,29,30,29]],
+/* 2032 */["20320211",0,[30,29,29,30,29,30,30,29,30,30,29,30]],
+/* 2033 */["20330131",11,[30,29,30,29,29,30,29,30,29,30,30,29,30]],
+/* 2034 */["20340219",0,[29,30,29,29,30,29,30,29,30,30,29,30]],
+/* 2035 */["20350208",0,[30,29,30,29,29,30,29,29,30,30,29,30]],
+/* 2036 */["20360128",6,[30,30,29,30,29,29,30,29,29,29,30,30,30]],
+/* 2037 */["20370215",0,[30,30,29,30,29,29,30,29,29,30,29,30]],
+/* 2038 */["20380204",0,[29,30,30,30,29,30,29,29,30,29,30,29]],
+/* 2039 */["20390125",5,[29,30,30,29,30,29,30,29,30,29,30,29,30]],
+/* 2040 */["20400213",0,[29,29,30,30,29,30,29,30,30,29,30,29]],
+/* 2041 */["20410201",0,[29,30,29,30,29,30,30,29,30,30,29,30]],
+/* 2042 */["20420122",2,[29,30,29,29,30,29,30,29,30,30,29,30,30]],
+/* 2043 */["20430210",0,[29,30,29,29,30,29,29,30,30,29,30,30]],
+/* 2044 */["20440130",7,[30,29,30,29,29,30,29,29,30,29,30,30,30]],
+/* 2045 */["20450217",0,[30,29,30,29,29,30,29,29,30,29,30,30]],
+/* 2046 */["20460206",0,[30,29,30,29,30,29,30,29,29,30,29,30]],
+/* 2047 */["20470126",5,[30,29,30,30,29,30,29,30,29,29,30,29,30]],
+/* 2048 */["20480214",0,[29,30,30,29,30,30,29,30,29,29,30,29]],
+/* 2049 */["20490202",0,[30,29,30,29,30,30,29,30,30,29,30,29]],
+/* 2050 */["20500123",3,[29,30,29,30,29,30,29,30,30,29,30,30,29]],
+/* 2051 */["20510211",0,[30,29,29,30,29,29,30,30,29,30,30,30]],
+/* 2052 */["20520201",8,[29,30,29,29,30,29,29,30,29,30,30,30,30]],
+/* 2053 */["20530219",0,[29,30,29,29,30,29,29,30,29,30,30,30]],
+/* 2054 */["20540208",0,[29,30,30,29,29,30,29,29,30,29,30,30]],
+/* 2055 */["20550128",6,[29,30,30,29,30,29,30,29,29,30,29,30,30]],
+/* 2056 */["20560215",0,[30,30,30,29,30,29,30,29,29,30,29,30]],
+/* 2057 */["20570204",0,[29,30,30,29,30,29,30,30,29,29,30,29]],
+/* 2058 */["20580124",4,[30,29,30,29,30,29,30,30,29,30,30,29,29]],
+/* 2059 */["20590212",0,[30,29,30,29,30,29,30,29,30,30,30,29]],
+/* 2060 */["20600202",0,[30,29,29,30,29,29,30,29,30,30,30,29]],
+/* 2061 */["20610121",3,[30,30,29,29,30,29,29,30,29,30,30,30,29]],
+/* 2062 */["20620209",0,[30,30,29,29,30,29,29,30,29,30,30,29]],
+/* 2063 */["20630129",7,[30,30,29,30,29,30,29,29,30,29,30,29,30]],
+/* 2064 */["20640217",0,[30,30,29,30,29,30,29,29,30,29,30,29]],
+/* 2065 */["20650205",0,[30,30,29,30,30,29,30,29,29,30,29,30]]
+];
+
+const GAN    = "甲乙丙丁戊己庚辛壬癸".split("");
+const ZHI    = "子丑寅卯辰巳午未申酉戌亥".split("");
+const ZODIAC = "鼠牛虎兔龍蛇馬羊猴雞狗豬".split("");
+const LMONTH = "正二三四五六七八九十冬臘".split("");
+const DAYT   = ["初","十","廿","卅"];
+const DAYU   = "一二三四五六七八九十".split("");
+const JIANZHU= "建除滿平定執破危成收開閉".split("");
+const YI     = ["出行,祈福","沐浴,掃舍","納財,祭祀","動土,修造","出行,開市","祭祀,祈福","服藥","齋醮,祭祀","開市,祭祀","祭祀,納財","出行,開市","修造,補垣"];
+const JI     = ["開市,動土","嫁娶,安葬","出行,開市","安葬,嫁娶","動土,安葬","出行,開市","百事不宜","出行,動土","動土,安葬","出行,開市","安葬,動土","出行,開市"];
+const CHONG  = "馬羊猴雞狗豬鼠牛虎兔龍蛇".split("");
+const SHA    = "南北東西南北東西南北東西".split("");
+const MZHI   = [1,2,3,4,5,6,7,8,9,10,11,0];
+const TERM_NAME = ["小寒","大寒","立春","雨水","驚蟄","春分","清明","穀雨","立夏","小滿","芒種","夏至","小暑","大暑","立秋","處暑","白露","秋分","寒露","霜降","立冬","小雪","大雪","冬至"];
+const TERM_MON  = [1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12];
+const B20       = [6.11,20.84,4.62,19.40,6.11,20.84,5.59,20.18,6.16,21.38,6.44,21.21,7.36,23.08,7.78,23.13,7.97,23.13,8.35,23.61,7.84,22.67,7.09,22.38];
+const DOW_CH = "一二三四五六日".split("");
+
+function parseYMD(s){return new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8));}
+function daysBetween(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000);}
+function daysInMonth(y,m){return new Date(y,m,0).getDate();}
+function toDateKey(y,m,d){return String(y)+String(m).padStart(2,'0')+String(d).padStart(2,'0');}
+function pad2(n){return String(n).padStart(2,'0');}
+
+function lunarDate(date){
+  const year=date.getFullYear();
+  let yi=year-1950;
+  if(yi<0)yi=0;if(yi>=LUNAR_DB.length)yi=LUNAR_DB.length-1;
+  let cnyd=parseYMD(LUNAR_DB[yi][0]);
+  if(date<cnyd){yi--;if(yi<0)yi=0;cnyd=parseYMD(LUNAR_DB[yi][0]);}
+  const diff=daysBetween(cnyd,date);
+  const leap=LUNAR_DB[yi][1],sz=LUNAR_DB[yi][2],ly=yi+1950;
+  let seq=1,inLp=false,days=0,lm=1,ld=1,isLeap=false;
+  for(let i=0;i<sz.length;i++){
+    const ms=sz[i];
+    if(diff<days+ms){ld=diff-days+1;lm=seq;isLeap=inLp;break;}
+    days+=ms;
+    if(leap>0&&seq===leap&&!inLp)inLp=true;
+    else{inLp=false;seq++;}
+  }
+  const mn=(isLeap?"閏":"")+LMONTH[lm-1]+"月";
+  let dn;
+  if(ld===10)dn="初十";
+  else if(ld===20)dn="二十";
+  else if(ld===30)dn="三十";
+  else{const t=Math.floor((ld-1)/10),u=(ld-1)%10;dn=DAYT[t]+DAYU[u];}
+  return{ly,lm,ld,isLeap,mn,dn};
+}
+
+function lunarGanzhi(date){
+  const y=date.getFullYear();
+  const yg=(((y-1984)%10)+1000)%10,yz=(((y-1984)%12)+1200)%12;
+  const base=new Date(2000,0,7),diff=daysBetween(base,date);
+  const dg=((diff%60)+600)%60,dayG=dg%10,dayZ=dg%12;
+  return GAN[yg]+ZHI[yz]+"年  "+GAN[dayG]+ZHI[dayZ]+"日  ("+ZODIAC[yz]+"年)";
+}
+
+function lunarSolar24(year,month){
+  const res=[];
+  for(let i=0;i<24;i++){
+    if(TERM_MON[i]===month){
+      let d=Math.floor(year*0.2422+B20[i])-Math.floor((year-1)/4);
+      if(year>=2000)d-=1;
+      if(d>=1&&d<=31)res.push({day:d,name:TERM_NAME[i]});
+    }
+  }
+  res.sort((a,b)=>a.day-b.day);
+  return res;
+}
+
+function lunarYiji(date){
+  const base=new Date(2000,0,7),diff=daysBetween(base,date);
+  const nDZ=((diff%12)+1200)%12,nMZ=MZHI[date.getMonth()],nJZ=((nDZ-nMZ+24)%12);
+  return{jz:JIANZHU[nJZ],yi:YI[nJZ],ji:JI[nJZ],chong:CHONG[nDZ],sha:SHA[nDZ]};
+}
+
+const FIXED_HOL={"0101":"元旦","0228":"和平紀念日","0404":"兒童節","0501":"勞動節","1010":"國慶日","1225":"聖誕節"};
+const LUNAR_HOL={"010101":"春節","010102":"春節","010103":"春節","000505":"端午節","000707":"七夕","000715":"中元節","000815":"中秋節","000909":"重陽節"};
+function getHoliday(m,d){return FIXED_HOL[pad2(m)+pad2(d)]||"";}
+function getLunarHoliday(lm,ld,isLeap){if(isLeap)return"";return LUNAR_HOL["00"+pad2(lm)+pad2(ld)]||"";}
+
+
+const termCache={};
+function getTermsForMonth(y,m){const k=y+"-"+m;if(!termCache[k])termCache[k]=lunarSolar24(y,m);return termCache[k];}
+const g=id=>document.getElementById(id);
+const now=new Date();
+let viewYear=now.getFullYear(),viewMonth=now.getMonth()+1;
+let selYear=viewYear,selMonth=viewMonth,selDay=now.getDate();
+const noteKeyOf=(y,m,d)=>"cal_note_"+toDateKey(y,m,d);
+const lsGet=k=>{try{return localStorage.getItem(k)||"";}catch(e){return "";}};
+const lsSet=(k,v)=>{try{if(v)localStorage.setItem(k,v);else localStorage.removeItem(k);}catch(e){}};
+function escHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");}
+
+function renderCalendar(){
+  const grid=g("cal-grid");
+  grid.innerHTML="";
+  g("cal-title").textContent=viewYear+"年"+viewMonth+"月";
+  const termMap={};
+  getTermsForMonth(viewYear,viewMonth).forEach(t=>termMap[t.day]=t.name);
+  const firstDow=(new Date(viewYear,viewMonth-1,1).getDay()+6)%7;
+  const daysCount=daysInMonth(viewYear,viewMonth);
+  const cells=Math.ceil((firstDow+daysCount)/7)*7;
+  for(let idx=0;idx<cells;idx++){
+    const c=idx%7,day=idx-firstDow+1;
+    const cell=document.createElement("div");
+    cell.className="c-cell";
+    if(day<1||day>daysCount){cell.classList.add("c-empty");grid.appendChild(cell);continue;}
+    if(c===5)cell.classList.add("sat");
+    if(c===6)cell.classList.add("sun");
+    if(day===now.getDate()&&viewMonth===now.getMonth()+1&&viewYear===now.getFullYear())cell.classList.add("today");
+    if(day===selDay&&viewMonth===selMonth&&viewYear===selYear)cell.classList.add("sel");
+    const ld=lunarDate(new Date(viewYear,viewMonth-1,day));
+    const hol=getHoliday(viewMonth,day)||getLunarHoliday(ld.lm,ld.ld,ld.isLeap);
+    if(hol)cell.classList.add("hol");
+    let h="";
+    if(lsGet(noteKeyOf(viewYear,viewMonth,day)))h+='<i class="c-note"></i>';
+    h+='<span class="c-day">'+day+'</span>';
+    if(hol)h+='<span class="c-hol">'+hol+'</span>';
+    h+='<span class="c-lunar">'+(ld.ld===1?ld.mn:(termMap[day]||ld.dn))+'</span>';
+    if(termMap[day]&&ld.ld!==1)h+='<i class="c-term"></i>';
+    cell.innerHTML=h;
+    cell.onclick=()=>selectDate(viewYear,viewMonth,day);
+    grid.appendChild(cell);
+  }
+}
+
+function selectDate(y,m,d){selYear=y;selMonth=m;selDay=d;renderCalendar();updateInfo();cancelNote();}
+
+function updateInfo(){
+  const d=new Date(selYear,selMonth-1,selDay);
+  g("cal-date").textContent="民國"+(selYear-1911)+"年 "+selMonth+"月 "+selDay+"日　星期"+DOW_CH[(d.getDay()+6)%7];
+  g("cal-gz").textContent="干支："+lunarGanzhi(d);
+  const ld=lunarDate(d);
+  g("cal-lunar").textContent="農曆："+ld.mn+ld.dn+(ld.isLeap?" (閏)":"");
+  const dayTerms=getTermsForMonth(selYear,selMonth).filter(t=>t.day===selDay);
+  g("cal-term").innerHTML=dayTerms.length?'<span class="tm">節氣：'+dayTerms.map(t=>t.name).join("、")+'</span>':"";
+  const hol=getHoliday(selMonth,selDay)||getLunarHoliday(ld.lm,ld.ld,ld.isLeap);
+  g("cal-hol").textContent=hol?"【"+hol+"】":"";
+  const yi=lunarYiji(d);
+  g("cal-yiji").innerHTML=yi.jz+"　<span class='yi'>宜："+yi.yi+"</span>　<span class='ji'>忌："+yi.ji+"</span>　沖"+yi.chong+" 煞"+yi.sha;
+  showNote();
+}
+
+function noteKey(){return noteKeyOf(selYear,selMonth,selDay);}
+function showNote(){const t=lsGet(noteKey());g("cal-note").innerHTML=t?'<div class="note">'+escHtml(t)+'</div>':"";}
+function editNote(){g("cal-ed").style.display="block";g("cal-ta").value=lsGet(noteKey());g("cal-ta").focus();}
+function saveNote(){lsSet(noteKey(),g("cal-ta").value.trim());cancelNote();renderCalendar();showNote();}
+function cancelNote(){g("cal-ed").style.display="none";}
+
+function shiftMonth(n){viewMonth+=n;if(viewMonth<1){viewMonth=12;viewYear--;}if(viewMonth>12){viewMonth=1;viewYear++;}
+  if(viewYear<1950){viewYear=1950;viewMonth=1;}if(viewYear>2065){viewYear=2065;viewMonth=12;}renderCalendar();}
+function goToday(){viewYear=now.getFullYear();viewMonth=now.getMonth()+1;selectDate(viewYear,viewMonth,now.getDate());}
+
+function showYMPicker(){
+  let ys="",ms="";
+  for(let y=1950;y<=2065;y++)ys+='<option value="'+y+'"'+(y===viewYear?" selected":"")+'>'+y+'年</option>';
+  for(let m=1;m<=12;m++)ms+='<option value="'+m+'"'+(m===viewMonth?" selected":"")+'>'+m+'月</option>';
+  openSheet('<h3>選擇年月</h3><div class="two" id="cal-ym"><select id="cal-sy">'+ys+'</select><select id="cal-sm">'+ms+'</select></div>'+
+    '<div class="btnrow"><button class="btn ghost" id="cal-ym-x">取消</button><button class="btn" id="cal-ym-ok">確定</button></div>');
+  g("cal-ym-x").onclick=closeSheet;
+  g("cal-ym-ok").onclick=()=>{viewYear=+g("cal-sy").value;viewMonth=+g("cal-sm").value;closeSheet();renderCalendar();};
+}
+
+function exportNotes(){
+  const data={};
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("cal_note_"))data[k]=localStorage.getItem(k);}}catch(e){}
+  const cnt=Object.keys(data).length;
+  if(!cnt){toast("目前沒有任何記事可匯出");return;}
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+  a.download="cal_notes_"+toDateKey(now.getFullYear(),now.getMonth()+1,now.getDate())+".json";
+  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast("已匯出 "+cnt+" 筆記事");
+}
+function importNotes(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);let cnt=0;
+      for(const k in data)if(k.startsWith("cal_note_")&&typeof data[k]==="string"){lsSet(k,data[k]);cnt++;}
+      toast("已匯入 "+cnt+" 筆記事");renderCalendar();showNote();
+    }catch(err){toast("檔案格式錯誤，請選擇正確的備份 JSON 檔");}
+  };
+  reader.readAsText(file,"UTF-8");
+  e.target.value="";
+}
+
+g("cal-prev").onclick=()=>shiftMonth(-1);
+g("cal-next").onclick=()=>shiftMonth(1);
+g("cal-today").onclick=goToday;
+g("cal-title").onclick=showYMPicker;
+g("cal-btn-note").onclick=editNote;
+g("cal-save").onclick=saveNote;
+g("cal-cancel").onclick=cancelNote;
+g("cal-exp").onclick=exportNotes;
+g("cal-imp").onclick=()=>g("cal-file").click();
+g("cal-file").onchange=importNotes;
+let touchX0=0;
+g("cal-grid").addEventListener("touchstart",e=>{touchX0=e.touches[0].clientX;},{passive:true});
+g("cal-grid").addEventListener("touchend",e=>{const dx=e.changedTouches[0].clientX-touchX0;if(Math.abs(dx)>50)shiftMonth(dx<0?1:-1);},{passive:true});
+
+renderCalendar();
+updateInfo();
 })();
 </script>
 </body>
