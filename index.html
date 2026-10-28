@@ -295,6 +295,14 @@ th{color:var(--muted);font-weight:600;text-align:left}
   <!-- 設定 -->
   <section class="view" id="v-set">
     <div class="card">
+      <h2>APP 名稱</h2>
+      <div class="row">
+        <input id="appNameIn" class="grow" maxlength="20" placeholder="家用進銷存">
+        <button class="btn" id="btnAppName">儲存</button>
+      </div>
+      <p class="small muted">顯示在首頁標題，例如「[你會紅]火龍果園」。空白則恢復「家用進銷存」。</p>
+    </div>
+    <div class="card">
       <h2>資料備份</h2>
       <p class="small muted" id="bkInfo"></p>
       <div class="btnrow">
@@ -339,7 +347,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center">家用進銷存 v2.0</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.1</p>
   </section>
 </main>
 
@@ -632,6 +640,16 @@ async function loadAll() {
   S.meta = Object.fromEntries(m.map(x => [x.k, x.v]));
 }
 async function setMeta(k, v) { S.meta[k] = v; await DB.put('meta', { k, v }); }
+const DEF_APPNAME = '家用進銷存';
+const appName = () => S.meta.appName || DEF_APPNAME;
+/* 自訂 APP 名稱 : 首頁標題、瀏覽器分頁、iPhone 加入主畫面的預設名稱 */
+function applyAppName() {
+  const n = appName();
+  document.title = n;
+  const m = document.querySelector('meta[name="apple-mobile-web-app-title"]'); if (m) m.content = n;
+  $('#verName').textContent = n;
+  if (S.view === 'home') $('#title').textContent = n;
+}
 const itemById = id => S.items.find(x => x.id === id);
 const custById = id => S.custs.find(x => x.id === id);
 const custName = t => (custById(t.custId) || {}).name || t.to || '';
@@ -694,7 +712,7 @@ function show(v) {
   S.view = v;
   $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  $('#title').textContent = { home: '家用進銷存', items: '物品', in: '購入', out: '使用', sale: '銷售 / 分享', acct: '帳戶收支', stats: '收支分析', set: '設定' }[v];
+  $('#title').textContent = { home: appName(), items: '物品', in: '購入', out: '使用', sale: '銷售 / 分享', acct: '帳戶收支', stats: '收支分析', set: '設定' }[v];
   window.scrollTo(0, 0);
   render();
 }
@@ -1816,6 +1834,7 @@ function renderSet() {
   $('#shopList').innerHTML = S.shops.map(s => `<li><div class="grow">${esc(s.name)}</div><span class="small muted">${S.txns.filter(t => t.shopId === s.id).length} 筆</span>
     <button class="iconbtn" data-shop-ren="${s.id}" aria-label="改名">✎</button><button class="iconbtn" data-shop-del="${s.id}" aria-label="刪除">✕</button></li>`).join('') || '<li class="empty">購入時輸入店家會自動加入</li>';
   $('#themeSel').value = S.meta.theme || '';
+  $('#appNameIn').value = S.meta.appName || '';
   if (navigator.storage && navigator.storage.persisted)
     navigator.storage.persisted().then(p => { $('#storeInfo').textContent = p ? '資料已設為永久保存。' : '瀏覽器尚未保證永久保存，安裝到主畫面後較不會被清除。'; });
 }
@@ -1829,6 +1848,9 @@ $('#btnShopAdd').onclick = async () => {
   const nm = $('#shopNew').value.trim(); if (!nm) return;
   if (S.shops.some(s => s.name === nm)) { toast('已有這個店家'); return; }
   const s = { name: nm }; s.id = await DB.put('shops', s); S.shops.push(s); $('#shopNew').value = ''; renderSet();
+};
+$('#btnAppName').onclick = async () => {
+  await setMeta('appName', $('#appNameIn').value.trim()); applyAppName(); toast('已儲存 APP 名稱');
 };
 $('#themeSel').onchange = async () => { await setMeta('theme', $('#themeSel').value); applyTheme(); };
 function applyTheme() { const t = S.meta.theme; if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
@@ -1853,8 +1875,8 @@ async function saveBlobs(list) {   // [{ name, blob }]
 const saveFile = (name, text, mime) => saveBlobs([{ name, blob: new Blob([text], { type: mime }) }]);
 const stamp = () => today().replace(/-/g, '');
 $('#btnBackup').onclick = async () => {
-  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders };
-  if (await saveFile(`家用進銷存備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
+  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders, appName: S.meta.appName || '' };
+  if (await saveFile(`${appName()}備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
     await setMeta('lastBackup', Date.now()); toast('備份完成'); renderSet();
   }
 };
@@ -1868,7 +1890,9 @@ $('#fileRestore').onchange = async e => {
   await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'], 'readwrite', t => {
     for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
   });
-  await loadAll(); await migrateCusts(); await migrateAccts(); toast('還原完成'); show('home');
+  await loadAll(); await migrateCusts(); await migrateAccts();
+  if (d.appName) await setMeta('appName', d.appName);   // 備份檔帶自訂 APP 名稱
+  applyAppName(); toast('還原完成'); show('home');
 };
 function csv(rows) { return '﻿' + rows.map(r => r.map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n'); }
 $('#btnCsvTx').onclick = () => {
@@ -1878,7 +1902,7 @@ $('#btnCsvTx').onclick = () => {
     const amt = t.type === 'in' || t.type === 'sale';
     rows.push([roc(t.date), { in: '購入', out: '使用', sale: t.amount ? '銷售' : '分享' }[t.type], it.dept, it.cat, it.name, t.qty, it.unit, amt ? t.price : '', amt ? t.amount : '', t.type === 'sale' ? custName(t) : shopName(t.shopId), acctName(t.acctId) || t.pay || '', roc(t.expiry), t.note]);
   }
-  saveFile(`家用進銷存紀錄_${stamp()}.csv`, csv(rows), 'text/csv');
+  saveFile(`${appName()}紀錄_${stamp()}.csv`, csv(rows), 'text/csv');
 };
 $('#btnCsvAcct').onclick = () => {
   const rows = [['日期', '類別', '帳戶', '轉入帳戶', '部門', '項目', '收入', '支出', '備註']];
@@ -1890,14 +1914,14 @@ $('#btnCsvAcct').onclick = () => {
   for (const x of all) rows.push(x.r);
   rows.push([]); rows.push(['帳戶', '類別', '期初', '目前餘額']);
   for (const a of S.accts) rows.push([a.name, a.type, a.open || 0, acctBal(a.id)]);
-  saveFile(`家用進銷存帳戶收支_${stamp()}.csv`, csv(rows), 'text/csv');
+  saveFile(`${appName()}帳戶收支_${stamp()}.csv`, csv(rows), 'text/csv');
 };
 $('#btnCsvCust').onclick = () => {
   const rows = [['代碼', '姓名', '類別', '電話', '地址', '備註', '銷售筆數', '銷售金額', '最近日期']];
   for (const c of [...S.custs].sort((a, b) => (a.code || '').localeCompare(b.code || ''))) {
     const st = custStat(c.id); rows.push([c.code, c.name, c.kind, c.phone, c.addr, c.note, st.n, st.amt, roc(st.last)]);
   }
-  saveFile(`家用進銷存客戶_${stamp()}.csv`, csv(rows), 'text/csv');
+  saveFile(`${appName()}客戶_${stamp()}.csv`, csv(rows), 'text/csv');
 };
 $('#btnCsvStock').onclick = () => {
   const rows = [['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '存放位置', '安全存量', '條碼']];
@@ -1905,13 +1929,13 @@ $('#btnCsvStock').onclick = () => {
     if (it.noStock) continue; const s = stockOf(it.id);
     rows.push([it.dept, it.cat, it.name, s.qty, it.unit, Math.round(s.avg * 100) / 100, Math.round(s.qty * s.avg), it.loc, it.safe || '', it.barcode]);
   }
-  saveFile(`家用進銷存庫存_${stamp()}.csv`, csv(rows), 'text/csv');
+  saveFile(`${appName()}庫存_${stamp()}.csv`, csv(rows), 'text/csv');
 };
 $('#btnWipe').onclick = async () => {
   if (!confirm('清除這支手機上的全部資料？')) return;
   if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
   await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta']) t.objectStore(s).clear(); });
-  await loadAll(); await migrateAccts(); applyTheme(); toast('已清除'); show('home');
+  await loadAll(); await migrateAccts(); applyTheme(); applyAppName(); toast('已清除'); show('home');
 };
 
 /* ========== 掃條碼 (Android Chrome 支援 BarcodeDetector ; 不支援時改手動輸入) ========== */
@@ -1960,7 +1984,7 @@ async function migrateAccts() {
 (async () => {
   try { await DB.open(); await loadAll(); await migrateCusts(); await migrateAccts(); }
   catch (e) { document.body.innerHTML = '<p style="padding:20px">這個瀏覽器無法儲存資料 (可能是私密瀏覽模式)。</p>'; return; }
-  applyTheme();
+  applyTheme(); applyAppName();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
