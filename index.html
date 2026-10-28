@@ -330,7 +330,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center">家用進銷存 v1.6</p>
+    <p class="small muted" style="text-align:center">家用進銷存 v1.8</p>
   </section>
 </main>
 
@@ -773,7 +773,7 @@ function itemForm(id, preset, done) {
     <label>優惠價 (依客戶類別、數量自動套用；多個符合取最低價)</label>
     <div id="f-rules"></div>
     <button class="btn ghost" id="f-radd" type="button" style="width:100%">＋ 新增優惠條件</button>
-    <div class="small muted" style="margin-top:4px">打折填 9 = 9折、85 = 85折；特價填金額。例：會員 9折、所有客戶滿 3 件特價 100。</div>
+    <div class="small muted" style="margin-top:4px">打折填 9 = 9折、85 = 85折；特價填金額。期間空白 = 不限日期，以銷售日期判斷。例：會員 9折、所有客戶滿 3 件特價 100、11/1~11/30 會員 8折。</div>
     <div class="two"><div><label>存放位置</label><input id="f-loc" value="${esc(it.loc)}" placeholder="例：廚房上櫃"></div>
       <div><label>安全存量</label><input id="f-safe" type="number" inputmode="decimal" min="0" value="${it.safe || ''}" placeholder="少於就提醒"></div></div>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="f-nostock" type="checkbox" style="width:22px;min-height:22px" ${it.noStock ? 'checked' : ''}> 不計庫存 (例：餐費、車資、學費，只記支出)</label>
@@ -792,7 +792,9 @@ function itemForm(id, preset, done) {
         <select data-k="type"><option value="pct" ${r.type !== 'amt' ? 'selected' : ''}>打折</option><option value="amt" ${r.type === 'amt' ? 'selected' : ''}>特價</option></select>
         <input data-k="v" type="number" inputmode="decimal" min="0" step="any" value="${r.v || ''}" placeholder="${r.type === 'amt' ? '$' : '9'}">
         <button class="iconbtn" type="button" data-del="${i}" aria-label="刪除" style="width:32px">✕</button>
-        <div class="small sale-c" style="grid-column:1/-1">${r.v > 0 && sp ? '→ ' + ruleLabel(r) + ' $' + fmt(rulePrice(sp, r)) : ''}</div></div>`).join('');
+        <div class="row" style="grid-column:1/-1;gap:4px"><span class="small muted" style="white-space:nowrap">期間</span>
+          <input data-k="from" type="date" value="${r.from || ''}" class="grow"><span class="muted">~</span><input data-k="to" type="date" value="${r.to || ''}" class="grow"></div>
+        <div class="small ${r.to && r.to < today() ? 'muted' : 'sale-c'}" style="grid-column:1/-1;margin-bottom:6px">${r.v > 0 && sp ? '→ ' + ruleLabel(r) + ' $' + fmt(rulePrice(sp, r)) + (r.to && r.to < today() ? ' (已過期)' : '') : ''}</div></div>`).join('');
   };
   rulesUI();
   $('#f-radd').onclick = () => { rules.push({ kind: '會員', min: 1, type: 'pct', v: '' }); rulesUI(); };
@@ -801,6 +803,7 @@ function itemForm(id, preset, done) {
     const row = e.target.closest('.rrow'), k = e.target.dataset.k; if (!row || !k) return;
     const r = rules[Number(row.dataset.i)];
     r[k] = k === 'min' || k === 'v' ? Number(e.target.value) || 0 : e.target.value;
+    if (r.from && r.to && r.from > r.to) [r.from, r.to] = [r.to, r.from];   // 起訖顛倒自動對調
     rulesUI();
   };
   $('#f-sp').oninput = rulesUI;
@@ -817,7 +820,7 @@ function itemForm(id, preset, done) {
     if (bar && S.items.some(x => x.barcode === bar && x.id !== id)) { toast('這個條碼已經用在其他物品'); return; }
     const rec = Object.assign(id ? { ...it } : {}, { name, dept, cat: $('#f-cat').value.trim(), unit: $('#f-unit').value.trim(),
       barcode: bar, sp: Number($('#f-sp').value) || 0, loc: $('#f-loc').value.trim(), safe: Number($('#f-safe').value) || 0, noStock: $('#f-nostock').checked, note: $('#f-note').value.trim(),
-      rules: rules.filter(r => r.v > 0).map(r => ({ kind: r.kind, min: Math.max(1, Number(r.min) || 1), type: r.type === 'amt' ? 'amt' : 'pct', v: Number(r.v) })) });
+      rules: rules.filter(r => r.v > 0).map(r => ({ kind: r.kind, min: Math.max(1, Number(r.min) || 1), type: r.type === 'amt' ? 'amt' : 'pct', v: Number(r.v), from: r.from || '', to: r.to || '' })) });
     const newId = await DB.put('items', rec); rec.id = rec.id ?? newId;
     if (id) S.items[S.items.findIndex(x => x.id === id)] = rec; else S.items.push(rec);
     closeSheet(); toast('已儲存'); render();
@@ -889,7 +892,7 @@ function txnForm(type, txnId, itemId, toName) {
     if (!cur) { $('#t-info').textContent = ''; return; }
     const st = stockOf(cur.id);
     $('#t-info').innerHTML = `${deptTag(cur.dept)} ${cur.noStock ? '不計庫存' : '庫存 ' + fmtQ(st.qty) + esc(cur.unit || '')}${st.avg ? ' · 平均 $' + fmt(st.avg) : ''}`;
-    if (isSale && !txnId && !$('#t-price').value && cur.sp) { $('#t-price').value = priceFor(cur, findCust($('#t-to').value), Number($('#t-qty').value) || 1).price; calcAmt(); }   // 售價 + 優惠
+    if (isSale && !txnId && !$('#t-price').value && cur.sp) { $('#t-price').value = priceFor(cur, findCust($('#t-to').value), Number($('#t-qty').value) || 1, $('#t-date').value || today()).price; calcAmt(); }   // 售價 + 優惠
     if (hasAmt && !txnId && !$('#t-price').value) {   // 帶入上次單價 / 店家
       const last = S.txns.filter(x => x.itemId === cur.id && x.type === type).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
       if (last) { $('#t-price').value = last.price || ''; if (isIn && !$('#t-shop').value) $('#t-shop').value = shopName(last.shopId); calcAmt(); }
@@ -1088,17 +1091,21 @@ function renderTxnList(type) {
 /* ========== 收銀 : 選會員 + 點商品加入購物車 + 一次結帳 (每項一筆銷售紀錄 , 同一張單 ord 相同) ========== */
 const lastAcct = () => S.meta.lastAcct && acctById(S.meta.lastAcct) ? S.meta.lastAcct : (S.accts[0] || {}).id;
 const priceOf = it => it.sp || (S.txns.filter(t => t.itemId === it.id && t.type === 'sale' && t.price).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0] || {}).price || 0;
-/* 優惠條件 (物品 rules) : { kind: 全部/會員/朋友/家人/其他, min: 數量滿 , type: pct 打折 / amt 特價 , v }
+/* 優惠條件 (物品 rules) : { kind: 全部/會員/朋友/家人/其他, min: 數量滿 , type: pct 打折 / amt 特價 , v , from ~ to 期間 (空白 = 不限) }
    打折 v : 9 = 9折、8.5 或 85 = 85折 ; 多個條件符合時取最低價 */
 const RKINDS = ['全部', ...KINDS];
 const discTxt = v => (v > 10 ? String(v) : String(v).replace('.', '')) + '折';
-const ruleLabel = r => [r.kind === '全部' ? '' : r.kind, r.min > 1 ? '滿' + fmtQ(r.min) + '件' : '', r.type === 'amt' ? '特價' : discTxt(r.v)].filter(Boolean).join(' ');
+const md = iso => Number(iso.slice(5, 7)) + '/' + Number(iso.slice(8, 10));
+const rulePeriod = r => r.from && r.to ? md(r.from) + '~' + md(r.to) : r.from ? md(r.from) + '起' : r.to ? '至' + md(r.to) : '';
+const ruleOn = (r, date) => (!r.from || date >= r.from) && (!r.to || date <= r.to);
+const ruleLabel = r => [rulePeriod(r), r.kind === '全部' ? '' : r.kind, r.min > 1 ? '滿' + fmtQ(r.min) + '件' : '', r.type === 'amt' ? '特價' : discTxt(r.v)].filter(Boolean).join(' ');
 const rulePrice = (base, r) => r.type === 'amt' ? Number(r.v) : Math.round(base * (r.v > 10 ? r.v / 100 : r.v / 10));
-function priceFor(it, cust, qty) {
+function priceFor(it, cust, qty, date) {
+  date = date || today();
   const base = priceOf(it); let best = { price: base, rule: '' };
   for (const r of it.rules || []) {
     if (r.kind !== '全部' && (!cust || cust.kind !== r.kind)) continue;
-    if ((qty || 1) < (r.min || 1)) continue;
+    if ((qty || 1) < (r.min || 1) || !ruleOn(r, date)) continue;
     const p = rulePrice(base, r);
     if (p < best.price) best = { price: p, rule: ruleLabel(r) };
   }
@@ -1129,6 +1136,7 @@ function posForm(preset) {
     <label>備註</label><input id="p-note" value="${esc(P.note)}">
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="p-cancel">取消</button><button class="btn sale" id="p-ok">結帳</button></div>`);
   $('#p-cust').oninput = () => { P.cust = $('#p-cust').value; posCinfo(); posReprice(); posTotal(); };
+  $('#p-date').onchange = () => { P.date = $('#p-date').value || today(); posReprice(); posTotal(); };
   $('#p-cinfo').onclick = e => { const c = e.target.closest('[data-c]'); if (c) { P.cust = $('#p-cust').value = custById(Number(c.dataset.c)).name; posCinfo(); posReprice(); posTotal(); } };
   $('#p-q').oninput = () => { P.q = $('#p-q').value; posGrid(); };
   $('#p-q').onkeydown = e => { if (e.key === 'Enter') { const it = S.items.find(x => x.barcode && x.barcode === P.q.trim()); if (it) { posAdd(it.id); P.q = $('#p-q').value = ''; posGrid(); } } };
@@ -1166,7 +1174,7 @@ function posCurCust() {
 /* 沒有手動改過單價的品項 , 依客戶 + 數量重算優惠價 */
 function posReprice() {
   const c = posCurCust();
-  for (const l of P.lines) { const it = itemById(l.id); if (!it || l.manual) continue; const r = priceFor(it, c, l.qty); l.price = r.price; l.rule = r.rule; }
+  for (const l of P.lines) { const it = itemById(l.id); if (!it || l.manual) continue; const r = priceFor(it, c, l.qty, P.date); l.price = r.price; l.rule = r.rule; }
 }
 function posSync() {
   if (!P || !$('#p-cust')) return;
@@ -1284,7 +1292,7 @@ function orderPaste() {
 function catalogData() {
   const items = S.items.filter(it => !it.noStock && it.sp > 0)
     .sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant'))
-    .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
+    .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).filter(r => !r.to || r.to >= today()).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
   return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, date: today(), items };
 }
 function catalogHtml() {
@@ -1300,7 +1308,7 @@ function catalogForm() {
     <label>說明 (取貨方式、付款方式)</label><textarea id="g-note">${esc(S.meta.catNote || '')}</textarea>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="g-qty" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowQty ? 'checked' : ''}> 顯示剩餘數量</label>
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
-    <p class="small muted">把下載的 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
+    <p class="small muted">電腦會存到「下載」資料夾 (iPhone 用分享選單存到「檔案」)。把 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
     會員選好商品按「用 LINE 傳送訂單」，你收到後在銷售頁按「貼上會員訂單」就會轉進收銀。<br>
     售價、庫存有變動時，重新下載上傳一次即可。</p>`);
   const keep = async () => {
@@ -1315,7 +1323,7 @@ function catalogForm() {
   $('#g-save').onclick = async () => {
     if (!n) { toast('還沒有物品設定售價'); return; }
     await keep();
-    if (await saveFile('catalog.html', catalogHtml(), 'text/html')) toast('型錄已產生');
+    if (await saveFile('catalog.html', catalogHtml(), 'text/html')) toast(isIOS ? '型錄已產生' : 'catalog.html 已存到「下載」資料夾');
   };
 }
 
@@ -1543,11 +1551,12 @@ $('#btnShopAdd').onclick = async () => {
 $('#themeSel').onchange = async () => { await setMeta('theme', $('#themeSel').value); applyTheme(); };
 function applyTheme() { const t = S.meta.theme; if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function saveFile(name, text, mime) {
   const blob = new Blob([text], { type: mime });
   const file = new File([blob], name, { type: mime });
-  // iPhone : 用分享選單存到「檔案」或雲端硬碟
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  // 只有 iPhone / iPad 用分享選單存到「檔案」 ; 電腦、Android 直接下載到「下載」資料夾
+  if (isIOS && navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: name }); return true; }
     catch (e) { if (e.name === 'AbortError') return false; }
   }
