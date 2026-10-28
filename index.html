@@ -102,6 +102,18 @@ svg text{fill:var(--muted);font-size:10px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;margin-top:6px}
 .legend i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
 video{width:100%;border-radius:10px;background:#000}
+/* 收銀 */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;max-height:300px;overflow:auto;padding:6px 4px 2px 0}
+.pitem{position:relative;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 8px;text-align:left;font:inherit;line-height:1.3;min-height:56px}
+.pitem:active{background:var(--brand-soft)}
+.pitem b{display:block;font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pitem.zero{opacity:.55}
+.pitem .badge{position:absolute;top:-6px;right:-4px;background:var(--sale);color:#fff;border-radius:10px;font-size:12px;padding:0 7px}
+.qbtn{width:34px;height:34px;min-height:34px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:17px;font-size:18px;padding:0;flex:none}
+.rrow{display:grid;grid-template-columns:1.25fr .8fr .95fr .95fr 32px;gap:4px;align-items:center;margin-bottom:4px}
+.rrow input,.rrow select{min-height:38px;padding:5px 6px;font-size:14px}
+.rrow.hd{font-size:12px;color:var(--muted);margin-bottom:2px}
+.cart-in{width:64px;min-height:32px;padding:3px 6px;text-align:right;font-size:14px}
 /* 萬年行事曆 (首頁頂部) */
 #cal{padding:0;overflow:hidden}
 #cal-hdr{background:var(--brand);color:var(--brand-ink);display:flex;align-items:center;gap:6px;padding:8px;user-select:none}
@@ -223,7 +235,14 @@ th{color:var(--muted);font-weight:600;text-align:left}
   <section class="view" id="v-sale">
     <div class="chips" id="saleTabs"></div>
     <div id="saleRec">
-      <button class="btn sale" style="width:100%;margin-bottom:12px" data-act="newSale">$ 新增銷售 / 分享</button>
+      <div class="btnrow" style="margin-bottom:8px">
+        <button class="btn sale" data-act="pos">收銀</button>
+        <button class="btn ghost" data-act="newSale">$ 單筆銷售 / 分享</button>
+      </div>
+      <div class="btnrow" style="margin-bottom:12px">
+        <button class="btn ghost" data-act="order">貼上會員訂單</button>
+        <button class="btn ghost" data-act="catalog">商品型錄網頁</button>
+      </div>
       <div id="saleList"></div>
     </div>
     <div id="saleCust" hidden>
@@ -311,7 +330,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center">家用進銷存 v1.4</p>
+    <p class="small muted" style="text-align:center">家用進銷存 v1.6</p>
   </section>
 </main>
 
@@ -328,6 +347,161 @@ th{color:var(--muted);font-weight:600;text-align:left}
 <div class="sheet-bg" id="sheetBg"></div>
 <div class="sheet" id="sheet"></div>
 <div class="toast" id="toast"></div>
+<!-- 商品型錄網頁樣板 : __DATA__ 換成商品資料 ; 樣板內的 script 結束標籤寫成 <\/script> , 產生時還原 -->
+<script type="text/plain" id="catTpl">
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>商品型錄</title>
+<style>
+:root{--bg:#f4f5f2;--card:#fff;--ink:#1f2523;--muted:#66706c;--line:#dfe3df;--brand:#3b64a8;--brand-ink:#fff;--soft:#e6ecf6}
+@media (prefers-color-scheme: dark){:root{--bg:#121614;--card:#1c2220;--ink:#e7ece9;--muted:#9aa5a0;--line:#2e3633;--brand:#86a9e6;--brand-ink:#0d1412;--soft:#232b38}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+header,main{max-width:720px;margin:0 auto;padding:0 16px}
+header{padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:6px}
+h1{font-size:22px;margin:0}
+.muted{color:var(--muted)}.small{font-size:13px}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 11px;min-height:44px}
+textarea{min-height:64px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;padding:5px 12px;font-size:14px;white-space:nowrap}
+.chip.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.card{background:var(--card);border-radius:12px;padding:4px 14px;margin:0 0 12px;box-shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05)}
+.it{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:0}
+.grow{flex:1;min-width:0}
+.ttl{font-weight:600}
+.price{font-weight:700;font-variant-numeric:tabular-nums;margin-right:4px}
+.q{width:36px;height:36px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:18px;font-size:20px;line-height:1;padding:0}
+.q:disabled{opacity:.35}
+.n{min-width:24px;text-align:center;font-variant-numeric:tabular-nums;font-weight:700}
+.sold{color:var(--muted);font-size:14px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+.bar .in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.btn{border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:600;background:var(--brand);color:var(--brand-ink)}
+.btn:disabled{opacity:.5}
+.btn.ghost{background:var(--soft);color:var(--ink)}
+.btn.line{background:#06c755;color:#fff}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btnrow .btn{flex:1}
+.empty{color:var(--muted);text-align:center;padding:18px 0}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header><h1 id="ttl"></h1><div class="small muted" id="sub"></div></header>
+<main>
+  <div id="note" class="small" style="white-space:pre-wrap"></div>
+  <input id="q" type="search" placeholder="搜尋商品" style="margin-top:8px">
+  <div class="chips" id="depts"></div>
+  <div class="card" id="list"></div>
+  <section id="form" class="card" style="padding:14px" hidden>
+    <h2 style="font-size:18px;margin:0 0 6px">填寫訂單</h2>
+    <div id="sum" class="small"></div>
+    <label>姓名 *</label><input id="nm" autocomplete="name">
+    <label>電話 *</label><input id="ph" type="tel" inputmode="tel" autocomplete="tel">
+    <label>備註 (取貨時間、地點)</label><textarea id="nt"></textarea>
+    <div class="btnrow"><button class="btn line" id="send">用 LINE 傳送訂單</button></div>
+    <div class="btnrow"><button class="btn ghost" id="copy">複製訂單文字</button><button class="btn ghost" id="clr">清空購物車</button></div>
+    <p class="small muted" id="how"></p>
+  </section>
+</main>
+<div class="bar"><div class="in"><div class="grow"><b id="tot"></b><div class="small muted" id="cnt"></div></div><button class="btn" id="go">填寫訂單</button></div></div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => (Math.round((n || 0) * 100) / 100).toLocaleString('zh-TW');
+const roc = iso => (Number(iso.slice(0, 4)) - 1911) + '.' + iso.slice(5, 7) + '.' + iso.slice(8, 10);
+const LS = 'catalog_' + D.title;
+const byId = id => D.items.find(x => x.i === id);
+let cart = {}, dept = '';
+function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2400); }
+function save() { try { localStorage.setItem(LS, JSON.stringify({ cart, nm: $('#nm').value, ph: $('#ph').value })); } catch (e) { } }
+try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); cart = s.cart || {}; $('#nm').value = s.nm || ''; $('#ph').value = s.ph || ''; } catch (e) { }
+for (const k of Object.keys(cart)) { const it = byId(Number(k)); if (!it || it.q <= 0) delete cart[k]; else if (cart[k] > it.q) cart[k] = it.q; }
+
+document.title = D.title + ' 商品型錄';
+$('#ttl').textContent = D.title;
+$('#sub').textContent = '更新日期 ' + roc(D.date) + ' · 共 ' + D.items.length + ' 項商品';
+$('#note').textContent = D.note || '';
+$('#how').textContent = D.line && D.line[0] === '@' ? '按「用 LINE 傳送訂單」會開啟 ' + D.line + ' 的聊天室，訂單文字已填好，按送出即可。'
+  : '按「用 LINE 傳送訂單」後，選擇' + (D.line ? '店家 (LINE ID：' + D.line + ') ' : '店家') + '的聊天室送出；也可以複製訂單文字自行貼上。';
+const depts = [...new Set(D.items.map(x => x.d))];
+
+function lines() { return Object.keys(cart).map(k => ({ it: byId(Number(k)), n: cart[k] })).filter(l => l.it && l.n > 0); }
+function chips() { $('#depts').innerHTML = depts.length > 1 ? ['', ...depts].map(d => '<button class="chip' + (dept === d ? ' on' : '') + '" data-d="' + esc(d) + '">' + esc(d || '全部') + '</button>').join('') : ''; }
+function list() {
+  const q = $('#q').value.trim().toLowerCase();
+  const arr = D.items.filter(x => (!dept || x.d === dept) && (!q || (x.n + ' ' + x.c).toLowerCase().includes(q)));
+  $('#list').innerHTML = arr.map(x => {
+    const n = cart[x.i] || 0, out = x.q <= 0;
+    return '<div class="it"><div class="grow"><div class="ttl">' + esc(x.n) + '</div><div class="small muted">' +
+      esc([x.c, x.u ? '每' + x.u : '', D.showQty && !out ? '尚有 ' + fmt(x.q) : ''].filter(Boolean).join(' · ')) + '</div>' +
+      (x.r && x.r.length ? '<div class="small" style="color:var(--brand)">' + esc(x.r.join(' · ')) + '</div>' : '') + '</div>' +
+      '<div class="price">$' + fmt(x.p) + '</div>' +
+      (out ? '<span class="sold">已售完</span>' : '<button class="q" data-m="' + x.i + '"' + (n ? '' : ' disabled') + '>−</button><span class="n">' + n +
+        '</span><button class="q" data-p="' + x.i + '"' + (n >= x.q ? ' disabled' : '') + '>＋</button>') + '</div>';
+  }).join('') || '<div class="empty">沒有符合的商品</div>';
+  total();
+}
+function total() {
+  const ls = lines(), cnt = ls.reduce((s, l) => s + l.n, 0), amt = ls.reduce((s, l) => s + l.n * l.it.p, 0);
+  $('#tot').textContent = cnt ? '合計 $' + fmt(amt) : '尚未選購';
+  $('#cnt').textContent = cnt ? ls.length + ' 項 · ' + fmt(cnt) + ' 件' : '點 ＋ 加入商品';
+  $('#go').disabled = !cnt;
+  $('#sum').innerHTML = ls.map(l => esc(l.it.n) + ' × ' + fmt(l.n) + ' = $' + fmt(l.n * l.it.p)).join('<br>') + (cnt ? '<br><b>合計 $' + fmt(amt) + '</b> <span class="muted">(定價)</span>' : '') +
+    (ls.some(l => l.it.r && l.it.r.length) ? '<br><span class="muted">符合條件的優惠價，店家確認訂單時會再計算。</span>' : '');
+  if (!cnt) $('#form').hidden = true;
+}
+$('#list').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const id = Number(b.dataset.p || b.dataset.m), it = byId(id);
+  cart[id] = Math.max(0, Math.min(it.q, (cart[id] || 0) + (b.dataset.p ? 1 : -1)));
+  if (!cart[id]) delete cart[id];
+  save(); list();
+};
+$('#depts').onclick = e => { const c = e.target.closest('.chip'); if (c) { dept = c.dataset.d; chips(); list(); } };
+$('#q').oninput = list;
+$('#go').onclick = () => { $('#form').hidden = false; $('#form').scrollIntoView({ behavior: 'smooth' }); };
+$('#nm').oninput = $('#ph').oninput = save;
+
+// 訂單文字格式 : 家用進銷存「貼上會員訂單」依 #編號 品名 x 數量 @ 單價 讀回
+function orderText() {
+  const ls = lines(); if (!ls.length) { toast('請先選購商品'); return ''; }
+  const nm = $('#nm').value.trim(), ph = $('#ph').value.trim();
+  if (!nm || !ph) { toast('請填寫姓名和電話'); (nm ? $('#ph') : $('#nm')).focus(); return ''; }
+  save();
+  const nt = $('#nt').value.trim().replace(/\s*\n\s*/g, ' ');
+  const amt = ls.reduce((s, l) => s + l.n * l.it.p, 0), cnt = ls.reduce((s, l) => s + l.n, 0);
+  return ['【訂單】' + D.title, '姓名：' + nm, '電話：' + ph, nt ? '備註：' + nt : '', '----',
+    ...ls.map(l => '#' + l.it.i + ' ' + l.it.n + ' x ' + l.n + ' @ ' + l.it.p + ' = ' + Math.round(l.n * l.it.p * 100) / 100),
+    '----', '合計 ' + cnt + ' 件 $' + fmt(amt)].filter(Boolean).join('\n');
+}
+$('#send').onclick = () => {
+  const t = orderText(); if (!t) return;
+  location.href = D.line && D.line[0] === '@' ? 'https://line.me/R/oaMessage/' + encodeURIComponent(D.line) + '/?' + encodeURIComponent(t)
+    : 'https://line.me/R/share?text=' + encodeURIComponent(t);
+};
+$('#copy').onclick = () => {
+  const t = orderText(); if (!t) return;
+  const ok = () => toast('已複製，請貼到 LINE 傳給店家');
+  const old = () => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { toast('無法複製'); } a.remove(); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, old); else old();
+};
+$('#clr').onclick = () => { if (confirm('清空購物車？')) { cart = {}; save(); list(); } };
+chips(); list();
+<\/script>
+</body>
+</html>
+</script>
 
 <script>
 'use strict';
@@ -484,6 +658,9 @@ document.body.addEventListener('click', e => {
   if (act === 'newIn') txnForm('in');
   else if (act === 'newOut') txnForm('out');
   else if (act === 'newSale') txnForm('sale');
+  else if (act === 'pos') posForm({});
+  else if (act === 'order') orderPaste();
+  else if (act === 'catalog') catalogForm();
   else if (act === 'newCust') custForm();
   else if (act === 'newAcct') acctForm();
   else if (act === 'acct') acctDetail(id);
@@ -585,13 +762,18 @@ $('#itemChips').onclick = e => { const c = e.target.closest('.chip'); if (c) { S
 $('#btnScanItem').onclick = () => scan(code => { $('#itemQ').value = code; renderItems(); });
 
 function itemForm(id, preset, done) {
-  const it = id ? itemById(id) : Object.assign({ name: '', dept: '其他', cat: '', unit: '個', barcode: '', loc: '', safe: 0, noStock: false, note: '' }, preset || {});
+  const it = id ? itemById(id) : Object.assign({ name: '', dept: '其他', cat: '', unit: '個', barcode: '', sp: 0, loc: '', safe: 0, noStock: false, note: '' }, preset || {});
   openSheet(`<h3>${id ? '修改物品' : '新增物品'}</h3>
     <label>品名 *</label><input id="f-name" value="${esc(it.name)}">
     <label>部門 *</label><div class="chips" id="f-dept" style="flex-wrap:wrap">${DEPTS.map((d, i) => `<button class="chip ${it.dept === d ? 'on' : ''}" data-d="${d}" style="${it.dept === d ? 'background:' + DCOL[i] + ';border-color:' + DCOL[i] : ''}">${d}</button>`).join('')}</div>
     <div class="two"><div><label>分類</label><input id="f-cat" value="${esc(it.cat)}" placeholder="例：乾貨、清潔"></div>
       <div><label>單位</label><input id="f-unit" value="${esc(it.unit)}" placeholder="個、包、瓶"></div></div>
     <label>條碼</label><div class="row"><input id="f-bar" class="grow" value="${esc(it.barcode)}" inputmode="numeric"><button class="btn ghost" id="f-scan" type="button">▦</button></div>
+    <label>售價 (收銀、商品型錄用；空白 = 不上架型錄)</label><input id="f-sp" type="number" inputmode="decimal" min="0" step="any" value="${it.sp || ''}">
+    <label>優惠價 (依客戶類別、數量自動套用；多個符合取最低價)</label>
+    <div id="f-rules"></div>
+    <button class="btn ghost" id="f-radd" type="button" style="width:100%">＋ 新增優惠條件</button>
+    <div class="small muted" style="margin-top:4px">打折填 9 = 9折、85 = 85折；特價填金額。例：會員 9折、所有客戶滿 3 件特價 100。</div>
     <div class="two"><div><label>存放位置</label><input id="f-loc" value="${esc(it.loc)}" placeholder="例：廚房上櫃"></div>
       <div><label>安全存量</label><input id="f-safe" type="number" inputmode="decimal" min="0" value="${it.safe || ''}" placeholder="少於就提醒"></div></div>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="f-nostock" type="checkbox" style="width:22px;min-height:22px" ${it.noStock ? 'checked' : ''}> 不計庫存 (例：餐費、車資、學費，只記支出)</label>
@@ -600,6 +782,28 @@ function itemForm(id, preset, done) {
       ${id ? '<button class="btn danger" id="f-del">刪除</button>' : ''}
       <button class="btn ghost" id="f-cancel">取消</button><button class="btn" id="f-ok">儲存</button></div>`);
   let dept = it.dept;
+  let rules = (it.rules || []).map(r => ({ ...r }));
+  const rulesUI = () => {
+    const sp = Number($('#f-sp').value) || 0;
+    $('#f-rules').innerHTML = (rules.length ? '<div class="rrow hd"><span>客戶</span><span>數量滿</span><span>方式</span><span>折數/金額</span><span></span></div>' : '') +
+      rules.map((r, i) => `<div class="rrow" data-i="${i}">
+        <select data-k="kind">${RKINDS.map(k => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${k === '全部' ? '所有客戶' : k}</option>`).join('')}</select>
+        <input data-k="min" type="number" inputmode="decimal" min="1" step="any" value="${r.min || 1}">
+        <select data-k="type"><option value="pct" ${r.type !== 'amt' ? 'selected' : ''}>打折</option><option value="amt" ${r.type === 'amt' ? 'selected' : ''}>特價</option></select>
+        <input data-k="v" type="number" inputmode="decimal" min="0" step="any" value="${r.v || ''}" placeholder="${r.type === 'amt' ? '$' : '9'}">
+        <button class="iconbtn" type="button" data-del="${i}" aria-label="刪除" style="width:32px">✕</button>
+        <div class="small sale-c" style="grid-column:1/-1">${r.v > 0 && sp ? '→ ' + ruleLabel(r) + ' $' + fmt(rulePrice(sp, r)) : ''}</div></div>`).join('');
+  };
+  rulesUI();
+  $('#f-radd').onclick = () => { rules.push({ kind: '會員', min: 1, type: 'pct', v: '' }); rulesUI(); };
+  $('#f-rules').onclick = e => { const d = e.target.closest('[data-del]'); if (d) { rules.splice(Number(d.dataset.del), 1); rulesUI(); } };
+  $('#f-rules').onchange = e => {
+    const row = e.target.closest('.rrow'), k = e.target.dataset.k; if (!row || !k) return;
+    const r = rules[Number(row.dataset.i)];
+    r[k] = k === 'min' || k === 'v' ? Number(e.target.value) || 0 : e.target.value;
+    rulesUI();
+  };
+  $('#f-sp').oninput = rulesUI;
   $('#f-dept').onclick = e => {
     const c = e.target.closest('.chip'); if (!c) return; dept = c.dataset.d;
     $$('#f-dept .chip').forEach((x, i) => { const on = x.dataset.d === dept; x.classList.toggle('on', on); x.style.background = on ? DCOL[i] : ''; x.style.borderColor = on ? DCOL[i] : ''; });
@@ -612,7 +816,8 @@ function itemForm(id, preset, done) {
     const bar = $('#f-bar').value.trim();
     if (bar && S.items.some(x => x.barcode === bar && x.id !== id)) { toast('這個條碼已經用在其他物品'); return; }
     const rec = Object.assign(id ? { ...it } : {}, { name, dept, cat: $('#f-cat').value.trim(), unit: $('#f-unit').value.trim(),
-      barcode: bar, loc: $('#f-loc').value.trim(), safe: Number($('#f-safe').value) || 0, noStock: $('#f-nostock').checked, note: $('#f-note').value.trim() });
+      barcode: bar, sp: Number($('#f-sp').value) || 0, loc: $('#f-loc').value.trim(), safe: Number($('#f-safe').value) || 0, noStock: $('#f-nostock').checked, note: $('#f-note').value.trim(),
+      rules: rules.filter(r => r.v > 0).map(r => ({ kind: r.kind, min: Math.max(1, Number(r.min) || 1), type: r.type === 'amt' ? 'amt' : 'pct', v: Number(r.v) })) });
     const newId = await DB.put('items', rec); rec.id = rec.id ?? newId;
     if (id) S.items[S.items.findIndex(x => x.id === id)] = rec; else S.items.push(rec);
     closeSheet(); toast('已儲存'); render();
@@ -638,7 +843,7 @@ function itemDetail(id) {
         <div><div class="small muted">目前庫存</div><div class="big">${it.noStock ? '—' : fmtQ(st.qty)}<span class="small muted"> ${esc(it.unit || '')}</span></div></div>
         <div><div class="small muted">平均單價</div><div class="big">${st.avg ? '$' + fmt(st.avg) : '—'}</div></div>
       </div>
-      <div class="small muted" style="margin-top:6px">${esc([it.cat && '分類 ' + it.cat, it.loc && '位置 ' + it.loc, it.safe && '安全存量 ' + it.safe, it.barcode && '條碼 ' + it.barcode, e && '最近到期 ' + roc(e)].filter(Boolean).join(' · '))}</div>
+      <div class="small muted" style="margin-top:6px">${esc([it.sp && '售價 $' + fmt(it.sp), (it.rules || []).length && '優惠 ' + it.rules.map(ruleLabel).join('、'), it.cat && '分類 ' + it.cat, it.loc && '位置 ' + it.loc, it.safe && '安全存量 ' + it.safe, it.barcode && '條碼 ' + it.barcode, e && '最近到期 ' + roc(e)].filter(Boolean).join(' · '))}</div>
       ${it.note ? `<div class="small" style="margin-top:4px">${esc(it.note)}</div>` : ''}
     </div>
     <div class="btnrow" style="margin-bottom:12px">
@@ -684,6 +889,7 @@ function txnForm(type, txnId, itemId, toName) {
     if (!cur) { $('#t-info').textContent = ''; return; }
     const st = stockOf(cur.id);
     $('#t-info').innerHTML = `${deptTag(cur.dept)} ${cur.noStock ? '不計庫存' : '庫存 ' + fmtQ(st.qty) + esc(cur.unit || '')}${st.avg ? ' · 平均 $' + fmt(st.avg) : ''}`;
+    if (isSale && !txnId && !$('#t-price').value && cur.sp) { $('#t-price').value = priceFor(cur, findCust($('#t-to').value), Number($('#t-qty').value) || 1).price; calcAmt(); }   // 售價 + 優惠
     if (hasAmt && !txnId && !$('#t-price').value) {   // 帶入上次單價 / 店家
       const last = S.txns.filter(x => x.itemId === cur.id && x.type === type).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0];
       if (last) { $('#t-price').value = last.price || ''; if (isIn && !$('#t-shop').value) $('#t-shop').value = shopName(last.shopId); calcAmt(); }
@@ -863,7 +1069,7 @@ function custDetail(id) {
       ${c.phone ? `<a class="btn ghost" style="text-align:center;text-decoration:none" href="tel:${esc(c.phone.replace(/[^0-9+]/g, ''))}">打電話</a>` : ''}
       <button class="btn ghost" id="cd-edit">修改</button></div>
     <div class="card"><h2>紀錄 (${hist.length})</h2><ul class="list">${hist.map(txnRow).join('') || '<li class="empty">尚無紀錄</li>'}</ul></div>`);
-  $('#cd-sale').onclick = () => txnForm('sale', null, null, c.name);
+  $('#cd-sale').onclick = () => posForm({ cust: c.name });
   $('#cd-edit').onclick = () => custForm(id);
 }
 
@@ -877,6 +1083,240 @@ function renderTxnList(type) {
     return `<div class="card"><div class="row"><h2 class="grow">${rocYM(k)}</h2>${type === 'in' ? `<span class="num small muted">合計 $${fmt(sum)}</span>` : type === 'sale' ? `<span class="num small muted">${groups[k].length} 筆 · 收入 $${fmt(sum)}</span>` : `<span class="small muted">${groups[k].length} 筆</span>`}</div>
       <ul class="list">${groups[k].map(txnRow).join('')}</ul></div>`;
   }).join('') || `<div class="card empty">還沒有${{ in: '購入', out: '使用', sale: '銷售 / 分享' }[type]}紀錄</div>`;
+}
+
+/* ========== 收銀 : 選會員 + 點商品加入購物車 + 一次結帳 (每項一筆銷售紀錄 , 同一張單 ord 相同) ========== */
+const lastAcct = () => S.meta.lastAcct && acctById(S.meta.lastAcct) ? S.meta.lastAcct : (S.accts[0] || {}).id;
+const priceOf = it => it.sp || (S.txns.filter(t => t.itemId === it.id && t.type === 'sale' && t.price).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)[0] || {}).price || 0;
+/* 優惠條件 (物品 rules) : { kind: 全部/會員/朋友/家人/其他, min: 數量滿 , type: pct 打折 / amt 特價 , v }
+   打折 v : 9 = 9折、8.5 或 85 = 85折 ; 多個條件符合時取最低價 */
+const RKINDS = ['全部', ...KINDS];
+const discTxt = v => (v > 10 ? String(v) : String(v).replace('.', '')) + '折';
+const ruleLabel = r => [r.kind === '全部' ? '' : r.kind, r.min > 1 ? '滿' + fmtQ(r.min) + '件' : '', r.type === 'amt' ? '特價' : discTxt(r.v)].filter(Boolean).join(' ');
+const rulePrice = (base, r) => r.type === 'amt' ? Number(r.v) : Math.round(base * (r.v > 10 ? r.v / 100 : r.v / 10));
+function priceFor(it, cust, qty) {
+  const base = priceOf(it); let best = { price: base, rule: '' };
+  for (const r of it.rules || []) {
+    if (r.kind !== '全部' && (!cust || cust.kind !== r.kind)) continue;
+    if ((qty || 1) < (r.min || 1)) continue;
+    const p = rulePrice(base, r);
+    if (p < best.price) best = { price: p, rule: ruleLabel(r) };
+  }
+  return best;
+}
+/* 會員查詢 : 代碼 / 姓名 / 手機完全符合 , 數字 3 碼以上比對電話尾碼 , 其他比對姓名片段 */
+function posCust(v) {
+  v = (v || '').trim(); if (!v) return [];
+  const c = findCust(v); if (c) return [c];
+  if (/^\d{3,}$/.test(v)) return S.custs.filter(x => digits(x.phone).endsWith(v)).slice(0, 8);
+  const lv = v.toLowerCase();
+  return S.custs.filter(x => x.name.toLowerCase().includes(lv)).slice(0, 8);
+}
+let P = null;
+function posForm(preset) {
+  if (preset || !P) P = Object.assign({ cust: '', newCust: null, lines: [], date: today(), note: '', acctId: lastAcct(), dept: '', q: '' }, preset || {});
+  const custOpts = S.custs.map(c => `<option value="${esc(c.name)}">${esc(c.code + ' ' + (c.kind || ''))}</option>`).join('');
+  openSheet(`<h3>收銀</h3>
+    <label>會員 / 客戶 (代碼、姓名、電話尾碼)</label>
+    <input id="p-cust" list="pDL" autocomplete="off" value="${esc(P.cust)}" placeholder="空白 = 不記會員"><datalist id="pDL">${custOpts}</datalist>
+    <div class="small muted" id="p-cinfo" style="margin-top:4px"></div>
+    <div class="row" style="margin-top:10px"><input id="p-q" type="search" class="grow" placeholder="搜尋品名或條碼" value="${esc(P.q)}"><button class="btn ghost" id="p-scan" type="button">▦</button></div>
+    <div class="chips" id="p-dept" style="padding-top:8px"></div>
+    <div class="pgrid" id="p-grid"></div>
+    <div class="card" style="margin-top:10px"><h2>購物車</h2><ul class="list" id="p-cart"></ul></div>
+    <div class="two"><div><label>日期</label><input id="p-date" type="date" value="${P.date}"></div>
+      <div><label>收款帳戶</label><select id="p-acct">${acctOpts(P.acctId)}</select></div></div>
+    <label>備註</label><input id="p-note" value="${esc(P.note)}">
+    <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="p-cancel">取消</button><button class="btn sale" id="p-ok">結帳</button></div>`);
+  $('#p-cust').oninput = () => { P.cust = $('#p-cust').value; posCinfo(); posReprice(); posTotal(); };
+  $('#p-cinfo').onclick = e => { const c = e.target.closest('[data-c]'); if (c) { P.cust = $('#p-cust').value = custById(Number(c.dataset.c)).name; posCinfo(); posReprice(); posTotal(); } };
+  $('#p-q').oninput = () => { P.q = $('#p-q').value; posGrid(); };
+  $('#p-q').onkeydown = e => { if (e.key === 'Enter') { const it = S.items.find(x => x.barcode && x.barcode === P.q.trim()); if (it) { posAdd(it.id); P.q = $('#p-q').value = ''; posGrid(); } } };
+  $('#p-dept').onclick = e => { const c = e.target.closest('.chip'); if (c) { P.dept = c.dataset.d; posGrid(); } };
+  $('#p-grid').onclick = e => { const b = e.target.closest('[data-id]'); if (b) posAdd(Number(b.dataset.id)); };
+  $('#p-cart').onclick = e => {
+    const b = e.target.closest('[data-m],[data-p]'); if (!b) return;   // − 減到 0 就移出購物車
+    const l = P.lines[Number(b.dataset.m ?? b.dataset.p)];
+    l.qty = Math.max(0, l.qty + (b.dataset.p !== undefined ? 1 : -1));
+    P.lines = P.lines.filter(x => x.qty > 0); posReprice(); posCart(); posGrid();
+  };
+  $('#p-cart').oninput = e => {
+    const i = e.target.dataset.pr ?? e.target.dataset.qt; if (i === undefined) return;
+    const l = P.lines[Number(i)];
+    if (e.target.dataset.pr !== undefined) { l.price = Number(e.target.value) || 0; l.manual = true; l.rule = ''; }   // 手動改價後不再自動套優惠
+    else { l.qty = Number(e.target.value) || 0; posReprice(); }
+    posTotal();
+  };
+  $('#p-scan').onclick = () => {
+    posSync();
+    scan(code => { posForm(); const it = S.items.find(x => x.barcode === code); if (it) posAdd(it.id); else toast('找不到這個條碼的物品'); });
+  };
+  $('#p-cancel').onclick = () => { if (P.lines.length && !confirm('放棄這張收銀單？')) return; P = null; closeSheet(); };
+  $('#p-ok').onclick = posCheckout;
+  posReprice(); posCinfo(); posGrid(); posCart();
+}
+/* 收銀目前的客戶 (算優惠用) : 尚未建檔的訂單新會員視為「會員」 */
+function posCurCust() {
+  const v = P.cust.trim(); if (!v) return null;
+  const c = findCust(v); if (c) return c;
+  const m = posCust(v);
+  if (/^\d{3,}$/.test(v) && m.length === 1) return m[0];
+  return P.newCust && P.newCust.name === v ? { kind: '會員' } : null;
+}
+/* 沒有手動改過單價的品項 , 依客戶 + 數量重算優惠價 */
+function posReprice() {
+  const c = posCurCust();
+  for (const l of P.lines) { const it = itemById(l.id); if (!it || l.manual) continue; const r = priceFor(it, c, l.qty); l.price = r.price; l.rule = r.rule; }
+}
+function posSync() {
+  if (!P || !$('#p-cust')) return;
+  P.cust = $('#p-cust').value; P.q = $('#p-q').value; P.date = $('#p-date').value || today(); P.acctId = Number($('#p-acct').value) || null; P.note = $('#p-note').value;
+}
+function posCinfo() {
+  const v = P.cust.trim(), m = posCust(v), exact = findCust(v);
+  $('#p-cinfo').innerHTML = !v ? '' : exact ? `${esc(exact.code)} ${esc(exact.name)} ${kindTag(exact.kind)}${exact.phone ? ' · ' + esc(exact.phone) : ''}`
+    : m.length ? '請點選：' + m.map(c => `<button class="chip" data-c="${c.id}" style="margin:2px">${esc(c.name)} ${esc((c.phone || c.code).slice(-4))}</button>`).join('')
+    : P.newCust && P.newCust.name === v ? `新會員 ${esc(P.newCust.phone)}，結帳時自動建檔` : '新客戶，結帳時自動建檔';
+}
+function posGrid() {
+  const all = S.items.filter(it => !it.noStock);
+  const depts = DEPTS.filter(d => all.some(it => it.dept === d));
+  $('#p-dept').innerHTML = depts.length > 1 ? ['', ...depts].map(d => `<button class="chip ${P.dept === d ? 'on' : ''}" data-d="${d}">${d || '全部'}</button>`).join('') : '';
+  const q = P.q.trim().toLowerCase();
+  const arr = all.filter(it => (!P.dept || it.dept === P.dept) && (!q || it.name.toLowerCase().includes(q) || (it.barcode || '') === q || (it.cat || '').toLowerCase().includes(q)))
+    .sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant')).slice(0, 80);
+  $('#p-grid').innerHTML = arr.map(it => {
+    const s = stockOf(it.id).qty, p = priceOf(it), n = P.lines.filter(l => l.id === it.id).reduce((a, l) => a + l.qty, 0);
+    return `<button class="pitem ${s <= 0 ? 'zero' : ''}" data-id="${it.id}"><b>${esc(it.name)}</b>
+      <span class="small ${p ? 'sale-c' : 'muted'}">${p ? '$' + fmt(p) : '未訂價'}</span><span class="small muted"> · 存 ${fmtQ(s)}</span>${n ? `<span class="badge">${fmtQ(n)}</span>` : ''}</button>`;
+  }).join('') || '<div class="empty">沒有物品</div>';
+}
+function posAdd(id) {
+  const it = itemById(id); if (!it) return;
+  const l = P.lines.find(x => x.id === id);
+  if (l) l.qty++; else P.lines.push({ id, qty: 1, price: 0 });
+  posReprice(); posCart(); posGrid();
+}
+function posCart() {
+  $('#p-cart').innerHTML = P.lines.map((l, i) => { const it = itemById(l.id) || { name: '(已刪除物品)', unit: '' };
+    return `<li><div class="grow"><div class="ttl">${esc(it.name)}</div>
+      <div class="small muted row" style="gap:4px">$<input class="cart-in" data-pr="${i}" type="number" inputmode="decimal" min="0" step="any" value="${l.price || ''}" placeholder="0">
+        × <input class="cart-in" data-qt="${i}" type="number" inputmode="decimal" min="0" step="any" value="${l.qty}" style="width:48px"><span style="white-space:nowrap">${esc(it.unit || '')}</span></div>
+      <div class="small sale-c" id="p-rule${i}"></div></div>
+      <button class="qbtn" data-m="${i}">−</button><button class="qbtn" data-p="${i}">＋</button>
+      <div class="num sale-c" style="min-width:60px" id="p-sub${i}"></div></li>`; }).join('')
+    || '<li class="empty">點上面的物品加入</li>';
+  posTotal();
+}
+function posTotal() {
+  let tot = 0, cnt = 0;
+  P.lines.forEach((l, i) => {
+    const a = Math.round(l.qty * l.price * 100) / 100; tot += a; cnt += l.qty;
+    const s = $('#p-sub' + i); if (s) s.textContent = '$' + fmt(a);
+    const pr = document.querySelector(`[data-pr="${i}"]`); if (pr && document.activeElement !== pr) pr.value = l.price || '';
+    const it = itemById(l.id), base = it ? priceOf(it) : 0, ru = $('#p-rule' + i);
+    if (ru) ru.textContent = l.rule ? `${l.rule} (定價 $${fmt(base)})` : l.manual && base && l.price !== base ? `手動改價 (定價 $${fmt(base)})` : '';
+  });
+  $('#p-ok').textContent = cnt ? `結帳 ${fmtQ(cnt)} 件 $${fmt(tot)}` : '結帳';
+}
+async function posCheckout() {
+  posSync();
+  const lines = P.lines.filter(l => l.qty > 0 && itemById(l.id));
+  if (!lines.length) { toast('購物車是空的'); return; }
+  const short = lines.filter(l => l.qty > stockOf(l.id).qty).map(l => `${itemById(l.id).name} 庫存 ${fmtQ(stockOf(l.id).qty)}，要賣 ${fmtQ(l.qty)}`);
+  if (short.length && !confirm(`庫存不足：\n${short.join('\n')}\n仍要結帳？`)) return;
+  const v = P.cust.trim();
+  let c = findCust(v);
+  if (v && !c) {
+    const m = posCust(v);
+    if (m.length === 1 && /^\d{3,}$/.test(v)) c = m[0];
+    else if (m.length) { toast('符合的客戶不只一位，請在下面點選'); return; }
+    else if (P.newCust && P.newCust.name === v) {
+      const ph = digits(P.newCust.phone);
+      c = { code: isMobile(ph) && !S.custs.some(x => x.code === ph) ? ph : nextCode(), name: v, kind: '會員', phone: P.newCust.phone, addr: '', note: '線上訂單建檔' };
+      c.id = await DB.put('custs', c); S.custs.push(c);
+    } else c = await custFor(v);
+  }
+  const ord = 'P' + Date.now(), pay = acctName(P.acctId);
+  let tot = 0;
+  for (const l of lines) {
+    const amount = Math.round(l.qty * l.price * 100) / 100; tot += amount;
+    const rec = { type: 'sale', date: P.date, itemId: l.id, qty: l.qty, price: l.price, amount, acctId: P.acctId, pay,
+      custId: c ? c.id : null, to: c ? c.name : '', note: P.note.trim(), ord, rule: l.rule || '' };
+    rec.id = await DB.put('txns', rec); S.txns.push(rec);
+    const it = itemById(l.id);
+    if (!it.sp && l.price > 0) { it.sp = l.price; await DB.put('items', it); }   // 第一次賣出的單價當售價
+  }
+  await setMeta('lastAcct', P.acctId);
+  P = null; closeSheet(); toast(`結帳完成 ${lines.length} 項 $${fmt(tot)}`); render();
+}
+
+/* ========== 會員訂單 : 型錄網頁產生的訂單文字 -> 收銀 ========== */
+function parseOrder(txt) {
+  const get = k => { const m = txt.match(new RegExp(k + '\\s*[:：]\\s*(.*)')); return m ? m[1].trim() : ''; };
+  const lines = [], miss = [];
+  for (const ln of txt.split(/\r?\n/)) {
+    const m = ln.match(/#(\d+)\s+(.*)\s+[x×]\s*([\d.]+)\s*(?:@\s*([\d.]+))?/);
+    if (!m) continue;
+    const name = m[2].trim(), it = S.items.find(x => x.name === name) || itemById(Number(m[1]));
+    if (!it) { miss.push(name); continue; }
+    lines.push({ id: it.id, qty: Number(m[3]) || 1, price: 0 });   // 單價在收銀依會員優惠重算
+  }
+  return { name: get('姓名'), phone: get('電話'), note: get('備註'), lines, miss };
+}
+function orderPaste() {
+  openSheet(`<h3>貼上會員訂單</h3>
+    <p class="small muted">把會員用 LINE 傳來的訂單整段複製，貼在下面，再按「轉入收銀」。</p>
+    <textarea id="o-ta" style="min-height:220px" placeholder="【訂單】...\n姓名：\n電話：\n#12 品名 x 2 @ 50 = 100"></textarea>
+    <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="o-paste">從剪貼簿貼上</button><button class="btn ghost" id="o-cancel">取消</button><button class="btn sale" id="o-ok">轉入收銀</button></div>`);
+  $('#o-cancel').onclick = closeSheet;
+  $('#o-paste').onclick = async () => { try { $('#o-ta').value = await navigator.clipboard.readText(); } catch { toast('無法讀取剪貼簿，請長按輸入框貼上'); } };
+  $('#o-ok').onclick = () => {
+    const o = parseOrder($('#o-ta').value);
+    if (!o.lines.length) { toast(o.miss.length ? '訂單裡的物品都找不到' : '看不懂這段文字，請貼上完整訂單'); return; }
+    if (o.miss.length) alert(`以下物品找不到，沒有轉入：\n${o.miss.join('\n')}`);
+    const d = digits(o.phone), c = (d.length >= 8 && S.custs.find(x => digits(x.phone) === d)) || findCust(o.name);
+    posForm({ cust: c ? c.name : o.name, newCust: c || !o.name ? null : { name: o.name, phone: o.phone }, lines: o.lines, note: '線上訂單' + (o.note ? ' ' + o.note : '') });
+  };
+}
+
+/* ========== 商品型錄 : 產生獨立網頁 (上傳 GitHub Pages 給會員看 , 下單用 LINE 傳回) ========== */
+function catalogData() {
+  const items = S.items.filter(it => !it.noStock && it.sp > 0)
+    .sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant'))
+    .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
+  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, date: today(), items };
+}
+function catalogHtml() {
+  const json = JSON.stringify(catalogData()).replace(/</g, '\\u003c');
+  return $('#catTpl').textContent.trim().replace('__DATA__', () => json).split('<\\/script>').join('</' + 'script>');
+}
+function catalogForm() {
+  const n = S.items.filter(it => !it.noStock && it.sp > 0).length, sold = S.items.filter(it => !it.noStock && it.sp > 0 && stockOf(it.id).qty <= 0).length;
+  openSheet(`<h3>商品型錄網頁</h3>
+    <p class="small">上架 ${n} 項${sold ? `，其中 ${sold} 項已售完 (會顯示「已售完」)` : ''}。<span class="muted">在「物品」裡填了售價的才會上架。</span></p>
+    <label>店名 / 型錄標題</label><input id="g-title" value="${esc(S.meta.catTitle || '家用小舖')}">
+    <label>LINE ID (官方帳號用 @ 開頭，可空白)</label><input id="g-line" value="${esc(S.meta.catLine || '')}" placeholder="@abc1234 或 個人 ID" autocapitalize="off">
+    <label>說明 (取貨方式、付款方式)</label><textarea id="g-note">${esc(S.meta.catNote || '')}</textarea>
+    <label class="row" style="color:var(--ink);margin-top:12px"><input id="g-qty" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowQty ? 'checked' : ''}> 顯示剩餘數量</label>
+    <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
+    <p class="small muted">把下載的 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
+    會員選好商品按「用 LINE 傳送訂單」，你收到後在銷售頁按「貼上會員訂單」就會轉進收銀。<br>
+    售價、庫存有變動時，重新下載上傳一次即可。</p>`);
+  const keep = async () => {
+    await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim());
+    await setMeta('catNote', $('#g-note').value.trim()); await setMeta('catShowQty', $('#g-qty').checked);
+  };
+  $('#g-view').onclick = async () => {
+    await keep();
+    const w = window.open(URL.createObjectURL(new Blob([catalogHtml()], { type: 'text/html' })), '_blank');
+    if (!w) toast('瀏覽器擋住了新視窗');
+  };
+  $('#g-save').onclick = async () => {
+    if (!n) { toast('還沒有物品設定售價'); return; }
+    await keep();
+    if (await saveFile('catalog.html', catalogHtml(), 'text/html')) toast('型錄已產生');
+  };
 }
 
 /* ========== 帳戶 ========== */
