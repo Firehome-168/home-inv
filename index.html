@@ -249,6 +249,11 @@ th{color:var(--muted);font-weight:600;text-align:left}
       </div>
       <div id="saleList"></div>
     </div>
+    <div id="saleOrd" hidden>
+      <div class="chips" id="ordChips"></div>
+      <div id="ordList"></div>
+      <button class="btn ghost" style="width:100%" data-act="order">貼上會員訂單</button>
+    </div>
     <div id="saleCust" hidden>
       <input id="custQ" type="search" placeholder="搜尋代碼、姓名、電話" class="search">
       <div class="chips" id="custChips"></div>
@@ -334,7 +339,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center">家用進銷存 v1.9</p>
+    <p class="small muted" style="text-align:center">家用進銷存 v2.0</p>
   </section>
 </main>
 
@@ -397,6 +402,8 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
 .btn.line{background:#06c755;color:#fff}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btnrow .btn{flex:1}
 .empty{color:var(--muted);text-align:center;padding:18px 0}
+.seg{display:flex;gap:8px}.seg button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px;font:inherit}
+.seg button.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}.seg button:disabled{opacity:.35}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 .toast.on{opacity:1}
 </style>
@@ -413,7 +420,15 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
     <div id="sum" class="small"></div>
     <label>姓名 *</label><input id="nm" autocomplete="name">
     <label>電話 *</label><input id="ph" type="tel" inputmode="tel" autocomplete="tel">
-    <label>備註 (取貨時間、地點)</label><textarea id="nt"></textarea>
+    <label>取貨方式</label><div class="seg" id="ship"><button type="button" data-v="自取">自取</button><button type="button" data-v="宅配">宅配</button></div>
+    <div id="shipHint" class="small muted" style="margin-top:4px"></div>
+    <div id="addrBox" hidden><label>收件地址 *</label><input id="ad" autocomplete="street-address"></div>
+    <label>付款方式</label><div class="seg" id="pay"><button type="button" data-v="現金">現金</button><button type="button" data-v="轉帳">轉帳</button></div>
+    <div id="bankBox" hidden>
+      <div id="bank" class="small" style="white-space:pre-wrap;background:var(--soft);border-radius:10px;padding:10px;margin-top:8px"></div>
+      <label>轉帳帳號末 5 碼 (轉帳後填寫，也可之後再用 LINE 告知)</label><input id="l5" inputmode="numeric" maxlength="5">
+    </div>
+    <label>備註 (取貨時間等)</label><textarea id="nt"></textarea>
     <div class="btnrow"><button class="btn line" id="send">用 LINE 傳送訂單</button></div>
     <div class="btnrow"><button class="btn ghost" id="copy">複製訂單文字</button><button class="btn ghost" id="clr">清空購物車</button></div>
     <p class="small muted" id="how"></p>
@@ -431,10 +446,10 @@ const fmt = n => (Math.round((n || 0) * 100) / 100).toLocaleString('zh-TW');
 const roc = iso => (Number(iso.slice(0, 4)) - 1911) + '.' + iso.slice(5, 7) + '.' + iso.slice(8, 10);
 const LS = 'catalog_' + D.title;
 const byId = id => D.items.find(x => x.i === id);
-let cart = {}, dept = '';
+let cart = {}, dept = '', ship = '自取', pay = '現金', ordNo = '';
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2400); }
-function save() { try { localStorage.setItem(LS, JSON.stringify({ cart, nm: $('#nm').value, ph: $('#ph').value })); } catch (e) { } }
-try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); cart = s.cart || {}; $('#nm').value = s.nm || ''; $('#ph').value = s.ph || ''; } catch (e) { }
+function save() { try { localStorage.setItem(LS, JSON.stringify({ cart, nm: $('#nm').value, ph: $('#ph').value, ad: $('#ad').value, ship, pay })); } catch (e) { } }
+try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); cart = s.cart || {}; $('#nm').value = s.nm || ''; $('#ph').value = s.ph || ''; $('#ad').value = s.ad || ''; ship = s.ship || '自取'; pay = s.pay || '現金'; } catch (e) { }
 for (const k of Object.keys(cart)) { const it = byId(Number(k)); if (!it || it.q <= 0) delete cart[k]; else if (cart[k] > it.q) cart[k] = it.q; }
 
 document.title = D.title + ' 商品型錄';
@@ -461,12 +476,16 @@ function list() {
   }).join('') || '<div class="empty">沒有符合的商品</div>';
   total();
 }
+// 運費 : 宅配且商品定價合計未滿免運門檻
+function feeOf(amt) { return ship === '宅配' && amt > 0 && !( D.free > 0 && amt >= D.free ) ? ( D.fee || 0 ) : 0; }
 function total() {
-  const ls = lines(), cnt = ls.reduce((s, l) => s + l.n, 0), amt = ls.reduce((s, l) => s + l.n * l.it.p, 0);
-  $('#tot').textContent = cnt ? '合計 $' + fmt(amt) : '尚未選購';
+  const ls = lines(), cnt = ls.reduce((s, l) => s + l.n, 0), amt = ls.reduce((s, l) => s + l.n * l.it.p, 0), fee = feeOf(amt);
+  $('#tot').textContent = cnt ? '合計 $' + fmt(amt + fee) + (fee ? ' (含運費)' : '') : '尚未選購';
   $('#cnt').textContent = cnt ? ls.length + ' 項 · ' + fmt(cnt) + ' 件' : '點 ＋ 加入商品';
   $('#go').disabled = !cnt;
-  $('#sum').innerHTML = ls.map(l => esc(l.it.n) + ' × ' + fmt(l.n) + ' = $' + fmt(l.n * l.it.p)).join('<br>') + (cnt ? '<br><b>合計 $' + fmt(amt) + '</b> <span class="muted">(定價)</span>' : '') +
+  $('#sum').innerHTML = ls.map(l => esc(l.it.n) + ' × ' + fmt(l.n) + ' = $' + fmt(l.n * l.it.p)).join('<br>') + (cnt ? '<br>商品合計 $' + fmt(amt) + ' <span class="muted">(定價)</span>' +
+      (ship === '宅配' ? '<br>運費 $' + fmt(fee) + (fee && D.free > 0 ? ' <span class="muted">(再買 $' + fmt(D.free - amt) + ' 免運)</span>' : fee ? '' : ' <span class="muted">(免運)</span>') : '') +
+      '<br><b>應付 $' + fmt(amt + fee) + '</b>' : '') +
     (ls.some(l => l.it.r && l.it.r.length) ? '<br><span class="muted">符合條件的優惠價，店家確認訂單時會再計算。</span>' : '');
   if (!cnt) $('#form').hidden = true;
 }
@@ -476,8 +495,22 @@ $('#list').onclick = e => {
   const id = Number(b.dataset.p || b.dataset.m), it = byId(id);
   cart[id] = Math.max(0, Math.min(it.q, (cart[id] || 0) + (b.dataset.p ? 1 : -1)));
   if (!cart[id]) delete cart[id];
+  ordNo = '';
   save(); list();
 };
+function segUI() {
+  if (ship === '宅配' && pay === '現金') pay = '轉帳';
+  document.querySelectorAll('#ship button').forEach(b => b.classList.toggle('on', b.dataset.v === ship));
+  document.querySelectorAll('#pay button').forEach(b => { b.classList.toggle('on', b.dataset.v === pay); b.disabled = ship === '宅配' && b.dataset.v === '現金'; });
+  $('#addrBox').hidden = ship !== '宅配';
+  $('#bankBox').hidden = pay !== '轉帳';
+  $('#bank').textContent = D.bank || '轉帳帳號請洽店家';
+  $('#shipHint').textContent = ship === '宅配' ? '宅配需先轉帳付款，確認入帳後出貨。運費 $' + fmt(D.fee) + (D.free > 0 ? '，商品滿 $' + fmt(D.free) + ' 免運' : '') : '';
+  total();
+}
+$('#ship').onclick = e => { const b = e.target.closest('button'); if (b) { ship = b.dataset.v; ordNo = ''; save(); segUI(); } };
+$('#pay').onclick = e => { const b = e.target.closest('button'); if (b && !b.disabled) { pay = b.dataset.v; save(); segUI(); } };
+$('#ad').oninput = save;
 $('#zoom').onclick = () => $('#zoom').classList.remove('on');
 $('#depts').onclick = e => { const c = e.target.closest('.chip'); if (c) { dept = c.dataset.d; chips(); list(); } };
 $('#q').oninput = list;
@@ -489,12 +522,16 @@ function orderText() {
   const ls = lines(); if (!ls.length) { toast('請先選購商品'); return ''; }
   const nm = $('#nm').value.trim(), ph = $('#ph').value.trim();
   if (!nm || !ph) { toast('請填寫姓名和電話'); (nm ? $('#ph') : $('#nm')).focus(); return ''; }
+  const ad = $('#ad').value.trim().replace(/\s*\n\s*/g, ' '), l5 = $('#l5').value.trim();
+  if (ship === '宅配' && !ad) { toast('請填寫收件地址'); $('#ad').focus(); return ''; }
   save();
   const nt = $('#nt').value.trim().replace(/\s*\n\s*/g, ' ');
-  const amt = ls.reduce((s, l) => s + l.n * l.it.p, 0), cnt = ls.reduce((s, l) => s + l.n, 0);
-  return ['【訂單】' + D.title, '姓名：' + nm, '電話：' + ph, nt ? '備註：' + nt : '', '----',
+  const amt = ls.reduce((s, l) => s + l.n * l.it.p, 0), cnt = ls.reduce((s, l) => s + l.n, 0), fee = feeOf(amt);
+  if (!ordNo) ordNo = 'W' + new Date().toISOString().replace(/\D/g, '').slice(2, 12) + ph.replace(/\D/g, '').slice(-3);
+  return ['【訂單】' + D.title, '單號：' + ordNo, '姓名：' + nm, '電話：' + ph, '取貨：' + ship, ship === '宅配' ? '地址：' + ad : '',
+    '付款：' + pay, pay === '轉帳' && l5 ? '末5碼：' + l5 : '', nt ? '備註：' + nt : '', '----',
     ...ls.map(l => '#' + l.it.i + ' ' + l.it.n + ' x ' + l.n + ' @ ' + l.it.p + ' = ' + Math.round(l.n * l.it.p * 100) / 100),
-    '----', '合計 ' + cnt + ' 件 $' + fmt(amt)].filter(Boolean).join('\n');
+    '----', '商品 ' + cnt + ' 件 $' + fmt(amt), ship === '宅配' ? '運費 $' + fmt(fee) : '', '應付 $' + fmt(amt + fee) + ' (定價，會員優惠另計)'].filter(Boolean).join('\n');
 }
 $('#send').onclick = () => {
   const t = orderText(); if (!t) return;
@@ -507,8 +544,8 @@ $('#copy').onclick = () => {
   const old = () => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { toast('無法複製'); } a.remove(); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, old); else old();
 };
-$('#clr').onclick = () => { if (confirm('清空購物車？')) { cart = {}; save(); list(); } };
-chips(); list();
+$('#clr').onclick = () => { if (confirm('清空購物車？')) { cart = {}; ordNo = ''; save(); list(); } };
+chips(); list(); segUI();
 <\/script>
 </body>
 </html>
@@ -520,7 +557,7 @@ chips(); list();
 const DEPTS = ['食','衣','住','行','育樂','健康','教育','其他'];
 const DCOL  = ['#c0752b','#7b5ea7','#3d7ea6','#4f8a3c','#c4517a','#2f9c8f','#a68a1f','#7a7f7c'];
 const ATYPES = ['現金', '銀行', '信用卡', '電子支付'], ACOL = ['#4f8a3c', '#3d7ea6', '#b4542d', '#7b5ea7'];
-const INC_CATS = ['薪資', '獎金', '利息', '股利', '租金', '退款', '其他'];
+const INC_CATS = ['薪資', '獎金', '利息', '股利', '租金', '退款', '運費', '其他'];
 const EXP_CATS = ['房租', '水電瓦斯', '電話網路', '保險', '稅費', '交通', '醫療', '學費', '孝親', '捐款', '其他'];
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -538,10 +575,10 @@ const DB = {
   open() {
     // 所有存取都先等資料庫開好 (第一次開啟可能較慢 , 避免太快點擊時資料沒存到)
     return this.ready = this.ready || new Promise((ok, bad) => {
-      const r = indexedDB.open('homeinv', 3);
-      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves (舊資料保留)
+      const r = indexedDB.open('homeinv', 4);
+      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders (舊資料保留)
         const d = r.result;
-        for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves'])
+        for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'])
           if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true });
         if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
       };
@@ -587,10 +624,10 @@ const DB = {
 };
 
 /* ========== 狀態 ========== */
-const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
+const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], orders: [], ordFilter: '處理中', meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
 
 async function loadAll() {
-  [S.items, S.shops, S.txns, S.custs, S.accts, S.moves] = await Promise.all(['items', 'shops', 'txns', 'custs', 'accts', 'moves'].map(x => DB.all(x)));
+  [S.items, S.shops, S.txns, S.custs, S.accts, S.moves, S.orders] = await Promise.all(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'].map(x => DB.all(x)));
   const m = await DB.all('meta');
   S.meta = Object.fromEntries(m.map(x => [x.k, x.v]));
 }
@@ -671,6 +708,7 @@ document.body.addEventListener('click', e => {
   else if (act === 'newSale') txnForm('sale');
   else if (act === 'pos') posForm({});
   else if (act === 'order') orderPaste();
+  else if (act === 'ordDetail') orderDetail(id);
   else if (act === 'catalog') catalogForm();
   else if (act === 'newCust') custForm();
   else if (act === 'newAcct') acctForm();
@@ -731,6 +769,7 @@ function renderHome() {
   let h = '';
   if (low.length) h += `<div class="card alert"><h2>快用完了 (${low.length})</h2><div class="small">${low.join('<br>')}</div></div>`;
   if (exp.length) h += `<div class="card alert"><h2>即將到期 (${exp.length})</h2><div class="small">${exp.join('<br>')}</div></div>`;
+  if (ordPending()) h += `<div class="card alert"><h2>訂單待處理 (${ordPending()})</h2><div class="small"><a href="#" onclick="S.saleTab='ord';show('sale');return false">前往訂單</a></div></div>`;
   if (S.txns.length && (bkDays === null || bkDays >= 14))
     h += `<div class="card alert"><h2>提醒備份</h2><div class="small">${bkDays === null ? '還沒備份過' : bkDays + ' 天沒備份了'}，資料只存在這支手機。<br><a href="#" onclick="show('set');return false">前往備份</a></div></div>`;
   $('#homeAlerts').innerHTML = h;
@@ -1013,11 +1052,12 @@ function txnForm(type, txnId, itemId, toName) {
 }
 
 function renderSale() {
-  $('#saleTabs').innerHTML = [['rec', '銷售紀錄'], ['cust', '客戶 (' + S.custs.length + ')']].map(([k, n]) => `<button class="chip ${S.saleTab === k ? 'on' : ''}" data-t="${k}">${n}</button>`).join('');
-  $('#saleRec').hidden = S.saleTab !== 'rec'; $('#saleCust').hidden = S.saleTab !== 'cust';
-  if (S.saleTab === 'rec') renderTxnList('sale'); else renderCusts();
+  $('#saleTabs').innerHTML = [['rec', '銷售紀錄'], ['ord', '訂單' + (ordPending() ? ' (' + ordPending() + ')' : '')], ['cust', '客戶 (' + S.custs.length + ')']].map(([k, n]) => `<button class="chip ${S.saleTab === k ? 'on' : ''}" data-t="${k}">${n}</button>`).join('');
+  $('#saleRec').hidden = S.saleTab !== 'rec'; $('#saleCust').hidden = S.saleTab !== 'cust'; $('#saleOrd').hidden = S.saleTab !== 'ord';
+  if (S.saleTab === 'rec') renderTxnList('sale'); else if (S.saleTab === 'ord') renderOrders(); else renderCusts();
 }
 $('#saleTabs').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.saleTab = c.dataset.t; renderSale(); } };
+$('#ordChips').onclick = e => { const c = e.target.closest('.chip'); if (c) { S.ordFilter = c.dataset.f; renderOrders(); } };
 function custStat(id) {
   let amt = 0, n = 0, share = 0, last = '';
   for (const t of S.txns) if (t.type === 'sale' && t.custId === id) { n++; amt += t.amount || 0; if (!t.amount) share++; if (t.date > last) last = t.date; }
@@ -1145,7 +1185,7 @@ function posCust(v) {
 }
 let P = null;
 function posForm(preset) {
-  if (preset || !P) P = Object.assign({ cust: '', newCust: null, lines: [], date: today(), note: '', acctId: lastAcct(), dept: '', q: '' }, preset || {});
+  if (preset || !P) P = Object.assign({ cust: '', newCust: null, lines: [], date: today(), note: '', acctId: lastAcct(), dept: '', q: '', orderId: null, fee: 0 }, preset || {});
   const custOpts = S.custs.map(c => `<option value="${esc(c.name)}">${esc(c.code + ' ' + (c.kind || ''))}</option>`).join('');
   openSheet(`<h3>收銀</h3>
     <label>會員 / 客戶 (代碼、姓名、電話尾碼)</label>
@@ -1157,10 +1197,12 @@ function posForm(preset) {
     <div class="card" style="margin-top:10px"><h2>購物車</h2><ul class="list" id="p-cart"></ul></div>
     <div class="two"><div><label>日期</label><input id="p-date" type="date" value="${P.date}"></div>
       <div><label>收款帳戶</label><select id="p-acct">${acctOpts(P.acctId)}</select></div></div>
+    ${P.orderId ? `<label>運費 (訂單 ${esc((S.orders.find(o => o.id === P.orderId) || {}).no || '')}，另記一筆運費收入)</label><input id="p-fee" type="number" inputmode="decimal" min="0" value="${P.fee || 0}">` : ''}
     <label>備註</label><input id="p-note" value="${esc(P.note)}">
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="p-cancel">取消</button><button class="btn sale" id="p-ok">結帳</button></div>`);
   $('#p-cust').oninput = () => { P.cust = $('#p-cust').value; posCinfo(); posReprice(); posTotal(); };
   $('#p-date').onchange = () => { P.date = $('#p-date').value || today(); posReprice(); posTotal(); };
+  if ($('#p-fee')) $('#p-fee').oninput = () => { P.fee = Number($('#p-fee').value) || 0; posTotal(); };
   $('#p-cinfo').onclick = e => { const c = e.target.closest('[data-c]'); if (c) { P.cust = $('#p-cust').value = custById(Number(c.dataset.c)).name; posCinfo(); posReprice(); posTotal(); } };
   $('#p-q').oninput = () => { P.q = $('#p-q').value; posGrid(); };
   $('#p-q').onkeydown = e => { if (e.key === 'Enter') { const it = S.items.find(x => x.barcode && x.barcode === P.q.trim()); if (it) { posAdd(it.id); P.q = $('#p-q').value = ''; posGrid(); } } };
@@ -1203,6 +1245,7 @@ function posReprice() {
 function posSync() {
   if (!P || !$('#p-cust')) return;
   P.cust = $('#p-cust').value; P.q = $('#p-q').value; P.date = $('#p-date').value || today(); P.acctId = Number($('#p-acct').value) || null; P.note = $('#p-note').value;
+  if ($('#p-fee')) P.fee = Number($('#p-fee').value) || 0;
 }
 function posCinfo() {
   const v = P.cust.trim(), m = posCust(v), exact = findCust(v);
@@ -1249,7 +1292,8 @@ function posTotal() {
     const it = itemById(l.id), base = it ? priceOf(it) : 0, ru = $('#p-rule' + i);
     if (ru) ru.textContent = l.rule ? `${l.rule} (定價 $${fmt(base)})` : l.manual && base && l.price !== base ? `手動改價 (定價 $${fmt(base)})` : '';
   });
-  $('#p-ok').textContent = cnt ? `結帳 ${fmtQ(cnt)} 件 $${fmt(tot)}` : '結帳';
+  const fee = P.orderId ? P.fee || 0 : 0;
+  $('#p-ok').textContent = cnt ? `結帳 ${fmtQ(cnt)} 件 $${fmt(tot + fee)}${fee ? ' (含運費)' : ''}` : '結帳';
 }
 async function posCheckout() {
   posSync();
@@ -1279,8 +1323,10 @@ async function posCheckout() {
     const it = itemById(l.id);
     if (!it.sp && l.price > 0) { it.sp = l.price; await DB.put('items', it); }   // 第一次賣出的單價當售價
   }
-  await setMeta('lastAcct', P.acctId);
-  P = null; closeSheet(); toast(`結帳完成 ${lines.length} 項 $${fmt(tot)}`); render();
+  const oid = P.orderId, fee = oid ? P.fee || 0 : 0;
+  if (oid) await orderPaid(oid, fee, tot, P.acctId, P.date); else await setMeta('lastAcct', P.acctId);   // 訂單依付款方式選帳戶 , 不改「上次帳戶」
+  P = null; closeSheet(); toast(`結帳完成 ${lines.length} 項 $${fmt(tot + fee)}${fee ? ' (含運費)' : ''}`); render();
+  if (oid) orderDetail(oid);
 }
 
 /* ========== 會員訂單 : 型錄網頁產生的訂單文字 -> 收銀 ========== */
@@ -1294,24 +1340,136 @@ function parseOrder(txt) {
     if (!m) continue;
     const name = m[2].trim(), it = S.items.find(x => normName(x.name) === normName(name)) || itemById(Number(m[1]));
     if (!it) { miss.push(name); continue; }
-    lines.push({ id: it.id, qty: Number(m[3]) || 1, price: 0 });   // 單價在收銀依會員優惠重算
+    lines.push({ id: it.id, qty: Number(m[3]) || 1, price: m[4] !== undefined ? Number(m[4]) : 0 });   // 型錄定價 ; 收銀時依會員優惠重算
   }
-  return { name: get('姓名'), phone: get('電話'), note: get('備註'), lines, miss };
+  return { no: get('單號'), name: get('姓名'), phone: get('電話'), ship: get('取貨'), addr: get('地址'), pay: get('付款'), last5: get('末5碼'), note: get('備註'), lines, miss };
 }
 function orderPaste() {
   openSheet(`<h3>貼上會員訂單</h3>
-    <p class="small muted">把會員用 LINE 傳來的訂單整段複製，貼在下面，再按「轉入收銀」。</p>
+    <p class="small muted">把會員用 LINE 傳來的訂單整段複製，貼在下面，再按「匯入訂單」。</p>
     <textarea id="o-ta" style="min-height:220px" placeholder="【訂單】...\n姓名：\n電話：\n#12 品名 x 2 @ 50 = 100"></textarea>
-    <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="o-paste">從剪貼簿貼上</button><button class="btn ghost" id="o-cancel">取消</button><button class="btn sale" id="o-ok">轉入收銀</button></div>`);
+    <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="o-paste">從剪貼簿貼上</button><button class="btn ghost" id="o-cancel">取消</button><button class="btn sale" id="o-ok">匯入訂單</button></div>`);
   $('#o-cancel').onclick = closeSheet;
   $('#o-paste').onclick = async () => { try { $('#o-ta').value = await navigator.clipboard.readText(); } catch { toast('無法讀取剪貼簿，請長按輸入框貼上'); } };
-  $('#o-ok').onclick = () => {
+  $('#o-ok').onclick = async () => {
     const o = parseOrder($('#o-ta').value);
     if (!o.lines.length) { toast(o.miss.length ? '訂單裡的物品都找不到' : '看不懂這段文字，請貼上完整訂單'); return; }
-    if (o.miss.length) alert(`以下物品找不到，沒有轉入：\n${o.miss.join('\n')}`);
-    const d = digits(o.phone), c = (d.length >= 8 && S.custs.find(x => digits(x.phone) === d)) || findCust(o.name);
-    posForm({ cust: c ? c.name : o.name, newCust: c || !o.name ? null : { name: o.name, phone: o.phone }, lines: o.lines, note: '線上訂單' + (o.note ? ' ' + o.note : '') });
+    if (o.miss.length) alert(`以下物品找不到，沒有匯入：\n${o.miss.join('\n')}`);
+    const dup = o.no && S.orders.find(x => x.no === o.no);
+    if (dup) { toast('這張訂單已經匯入過'); orderDetail(dup.id); return; }
+    const rec = { no: o.no || 'W' + today().replace(/-/g, '').slice(2) + String(Date.now()).slice(-4), date: today(), name: o.name, phone: o.phone,
+      ship: o.ship === '宅配' ? '宅配' : '自取', addr: o.addr, pay: o.pay === '轉帳' ? '轉帳' : '現金', last5: o.last5, note: o.note,
+      lines: o.lines, status: '待收款', track: '' };
+    rec.fee = orderFee(rec.ship, rec.lines);
+    await orderSave(rec);
+    S.saleTab = 'ord'; render(); orderDetail(rec.id); toast('訂單已匯入');
   };
+}
+
+/* ========== 訂單 : 型錄網頁訂單 (自取 / 宅配 , 現金 / 轉帳 , 滿額免運) ==========
+   狀態 : 待收款 -> (收款結帳) -> 自取 = 已完成 ; 宅配 = 待出貨 -> (出貨 , 託運單號) -> 已出貨 -> 已完成 ; 任何未完成可取消 */
+const OSTAT = ['待收款', '待出貨', '已出貨', '已完成', '已取消'], OCOL = ['#b07a12', '#b4542d', '#3b64a8', '#4f8a3c', '#7a7f7c'];
+const ostTag = s => `<span class="tag" style="background:${OCOL[Math.max(0, OSTAT.indexOf(s))]}">${esc(s)}</span>`;
+const shipFee = () => S.meta.catFee === undefined ? 100 : Number(S.meta.catFee) || 0;
+const freeOver = () => S.meta.catFree === undefined ? 500 : Number(S.meta.catFree) || 0;
+// 運費 : 宅配且商品定價合計未滿免運門檻 (與型錄網頁算法相同 , 以定價計)
+const orderFee = (ship, lines) => ship !== '宅配' ? 0 : lines.reduce((s, l) => s + l.qty * priceOf(itemById(l.id) || {}), 0) >= freeOver() && freeOver() > 0 ? 0 : shipFee();
+const payAcct = pay => ((pay === '轉帳' ? S.accts.find(a => a.type === '銀行') : S.accts.find(a => a.type === '現金')) || {}).id || lastAcct();
+const ordPending = () => S.orders.filter(o => ['待收款', '待出貨', '已出貨'].includes(o.status)).length;
+
+async function orderSave(o) {
+  const newId = await DB.put('orders', o); o.id = o.id ?? newId;
+  const i = S.orders.findIndex(x => x.id === o.id); if (i >= 0) S.orders[i] = o; else S.orders.push(o);
+  return o;
+}
+function orderSum(o) { return o.lines.reduce((s, l) => s + l.qty * (l.price || priceOf(itemById(l.id) || {})), 0); }
+
+function renderOrders() {
+  const f = S.ordFilter || '處理中';
+  $('#ordChips').innerHTML = ['處理中', '全部', '已完成', '已取消'].map(k => `<button class="chip ${f === k ? 'on' : ''}" data-f="${k}">${k}</button>`).join('');
+  const arr = S.orders.filter(o => f === '全部' || (f === '處理中' ? ['待收款', '待出貨', '已出貨'].includes(o.status) : o.status === f))
+    .sort((a, b) => OSTAT.indexOf(a.status) - OSTAT.indexOf(b.status) || b.id - a.id);
+  $('#ordList').innerHTML = arr.length ? `<div class="card"><ul class="list">${arr.map(o => `<li class="tap" data-act="ordDetail" data-id="${o.id}">
+      <div class="grow"><div class="ttl">${esc(o.name || '(未填姓名)')} <span class="small muted">${esc(o.no)}</span></div>
+        <div class="small muted">${roc(o.date)} · ${esc(o.ship)} · ${esc(o.pay)}${o.last5 ? ' 末5碼 ' + esc(o.last5) : ''}${o.track ? ' · 單號 ' + esc(o.track) : ''}</div></div>
+      ${ostTag(o.status)}<div class="num" style="min-width:64px">$${fmt(o.paid || orderSum(o) + (o.fee || 0))}</div></li>`).join('')}</ul></div>`
+    : '<div class="card empty">沒有訂單<br><span class="small">會員在型錄網頁下單後，用「貼上會員訂單」匯入</span></div>';
+}
+
+function orderDetail(id) {
+  const o = S.orders.find(x => x.id === id); if (!o) return;
+  const sub = orderSum(o);
+  const rows = o.lines.map(l => { const it = itemById(l.id) || { name: '(已刪除物品)', unit: '' };
+    return `<li><div class="grow">${esc(it.name)}</div><div class="small muted">${fmtQ(l.qty)}${esc(it.unit || '')} × $${fmt(l.price || priceOf(it))}</div></li>`; }).join('');
+  const st = o.status;
+  openSheet(`<div class="row"><h3 class="grow">訂單 ${esc(o.no)}</h3>${ostTag(st)}</div>
+    <div class="card small">
+      <div>${roc(o.date)} · <b>${esc(o.name)}</b> ${esc(o.phone)}</div>
+      <div>取貨：${esc(o.ship)}${o.ship === '宅配' ? '　地址：' + esc(o.addr || '(未填)') : ''}</div>
+      <div>付款：${esc(o.pay)}${o.last5 ? '　轉帳末5碼：' + esc(o.last5) : ''}</div>
+      ${o.track ? `<div>出貨：${esc(o.carrier || '')} 單號 ${esc(o.track)} (${roc(o.shipDate || '')})</div>` : ''}
+      ${o.note ? `<div>備註：${esc(o.note)}</div>` : ''}
+      ${o.paid ? `<div class="sale-c">已收款 $${fmt(o.paid)} (${roc(o.paidDate || '')}，含運費 $${fmt(o.fee || 0)})</div>` : ''}
+    </div>
+    <div class="card"><ul class="list">${rows}</ul>
+      <div class="row small" style="margin-top:6px"><span class="grow muted">商品 (定價)</span><span class="num">$${fmt(sub)}</span></div>
+      <div class="row small"><span class="grow muted">運費${o.ship === '宅配' && !o.fee ? ' (滿 $' + fmt(freeOver()) + ' 免運)' : ''}</span><span class="num">$${fmt(o.fee || 0)}</span></div>
+      <div class="row"><b class="grow">應收 (會員優惠於結帳時計算)</b><b class="num">$${fmt(sub + (o.fee || 0))}</b></div></div>
+    <div class="btnrow">
+      ${st === '待收款' ? '<button class="btn sale" id="od-pay">收款結帳</button>' : ''}
+      ${st === '待出貨' ? '<button class="btn" id="od-ship">出貨</button>' : ''}
+      ${st === '已出貨' ? '<button class="btn" id="od-done">完成</button><button class="btn ghost" id="od-notice">傳出貨通知</button>' : ''}
+      ${['待收款', '待出貨', '已出貨'].includes(st) ? '<button class="btn danger" id="od-cancel">取消訂單</button>' : '<button class="btn danger" id="od-del">刪除</button>'}
+    </div>
+    ${st === '待收款' && o.pay === '轉帳' ? '<p class="small muted">轉帳訂單：請先核對銀行入帳 (末5碼) 再按收款結帳。</p>' : ''}
+    ${st === '待出貨' || st === '已出貨' ? '<p class="small warn" style="color:var(--warn)">已結帳的訂單取消時，銷售紀錄不會自動刪除，請到銷售紀錄自行刪除或改退款。</p>' : ''}`);
+  const on = (sel, fn) => { const b = $(sel); if (b) b.onclick = fn; };
+  on('#od-pay', () => {
+    const c = (digits(o.phone).length >= 8 && S.custs.find(x => digits(x.phone) === digits(o.phone))) || findCust(o.name);
+    posForm({ cust: c ? c.name : o.name, newCust: c || !o.name ? null : { name: o.name, phone: o.phone },
+      lines: o.lines.map(l => ({ id: l.id, qty: l.qty, price: 0 })), note: '訂單 ' + o.no + (o.note ? ' ' + o.note : ''),
+      orderId: o.id, fee: o.fee || 0, acctId: payAcct(o.pay) });
+  });
+  on('#od-ship', () => orderShipForm(o));
+  on('#od-notice', () => orderNotice(o));
+  on('#od-done', async () => { o.status = '已完成'; await orderSave(o); closeSheet(); toast('訂單已完成'); render(); });
+  on('#od-cancel', async () => { if (!confirm(`取消訂單 ${o.no}？`)) return; o.status = '已取消'; await orderSave(o); closeSheet(); toast('訂單已取消'); render(); });
+  on('#od-del', async () => { if (!confirm(`刪除訂單 ${o.no}？`)) return; await DB.del('orders', o.id); S.orders = S.orders.filter(x => x.id !== o.id); closeSheet(); toast('已刪除'); render(); });
+}
+
+function orderShipForm(o) {
+  openSheet(`<h3>出貨 ${esc(o.no)}</h3>
+    <div class="small">${esc(o.name)} ${esc(o.phone)}<br>${esc(o.addr || '')}</div>
+    <div class="two"><div><label>物流</label><select id="os-car">${['黑貓宅急便', '中華郵政', '新竹物流', '其他'].map(c => `<option ${S.meta.lastCarrier === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+      <div><label>出貨日期</label><input id="os-date" type="date" value="${today()}"></div></div>
+    <label>託運單號</label><input id="os-track" inputmode="numeric" autocomplete="off">
+    <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="os-x">取消</button><button class="btn" id="os-ok">確認出貨</button></div>`);
+  $('#os-x').onclick = () => orderDetail(o.id);
+  $('#os-ok').onclick = async () => {
+    const t = $('#os-track').value.trim(); if (!t) { toast('請輸入託運單號'); return; }
+    Object.assign(o, { status: '已出貨', carrier: $('#os-car').value, track: t, shipDate: $('#os-date').value || today() });
+    await setMeta('lastCarrier', o.carrier); await orderSave(o);
+    render(); orderDetail(o.id);
+    if (confirm('已出貨。要用 LINE 傳出貨通知給會員嗎？')) orderNotice(o);
+  };
+}
+
+function orderNotice(o) {
+  const t = [`【出貨通知】${S.meta.catTitle || '家用小舖'}`, `${o.name} 您好，您的訂單 ${o.no} 已於 ${roc(o.shipDate || today())} 寄出`,
+    `${o.carrier || ''} 託運單號：${o.track}`, o.addr ? `收件地址：${o.addr}` : '', '謝謝您的訂購！'].filter(Boolean).join('\n');
+  if (navigator.share) navigator.share({ text: t }).catch(() => {});
+  else window.open('https://line.me/R/share?text=' + encodeURIComponent(t), '_blank');
+}
+
+/* 收銀結帳完成後 : 運費記收入 , 訂單改狀態 */
+async function orderPaid(orderId, fee, tot, acctId, date) {
+  const o = S.orders.find(x => x.id === orderId); if (!o) return;
+  if (fee > 0) {
+    const m = { type: 'inc', date, amount: fee, acctId, toId: null, cat: '運費', dept: '', note: '訂單 ' + o.no };
+    m.id = await DB.put('moves', m); S.moves.push(m);
+  }
+  Object.assign(o, { status: o.ship === '宅配' ? '待出貨' : '已完成', fee, paid: tot + fee, paidDate: date });
+  await orderSave(o);
 }
 
 /* ========== 商品型錄 : 產生獨立網頁 (上傳 GitHub Pages 給會員看 , 下單用 LINE 傳回) ========== */
@@ -1319,7 +1477,7 @@ function catalogData() {
   const items = S.items.filter(it => !it.noStock && it.sp > 0)
     .sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant'))
     .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, im: it.img || '', q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).filter(r => !r.to || r.to >= today()).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
-  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, date: today(), items };
+  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(), items };
 }
 function catalogHtml() {
   const json = JSON.stringify(catalogData()).replace(/</g, '\\u003c');
@@ -1332,6 +1490,9 @@ function catalogForm() {
     <label>店名 / 型錄標題</label><input id="g-title" value="${esc(S.meta.catTitle || '家用小舖')}">
     <label>LINE ID (官方帳號用 @ 開頭，可空白)</label><input id="g-line" value="${esc(S.meta.catLine || '')}" placeholder="@abc1234 或 個人 ID" autocapitalize="off">
     <label>說明 (取貨方式、付款方式)</label><textarea id="g-note">${esc(S.meta.catNote || '')}</textarea>
+    <div class="two"><div><label>宅配運費</label><input id="g-fee" type="number" inputmode="numeric" min="0" value="${shipFee()}"></div>
+      <div><label>滿額免運 (0 = 不免運)</label><input id="g-free" type="number" inputmode="numeric" min="0" value="${freeOver()}"></div></div>
+    <label>轉帳帳號 (會員選轉帳時顯示)</label><textarea id="g-bank" placeholder="例：台灣銀行 (004) 123-456-789012 戶名 王小明">${esc(S.meta.catBank || '')}</textarea>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="g-qty" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowQty ? 'checked' : ''}> 顯示剩餘數量</label>
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
     <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button></div>
@@ -1342,6 +1503,7 @@ function catalogForm() {
   const keep = async () => {
     await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim());
     await setMeta('catNote', $('#g-note').value.trim()); await setMeta('catShowQty', $('#g-qty').checked);
+    await setMeta('catFee', Number($('#g-fee').value) || 0); await setMeta('catFree', Number($('#g-free').value) || 0); await setMeta('catBank', $('#g-bank').value.trim());
   };
   $('#g-view').onclick = async () => {
     await keep();
@@ -1691,7 +1853,7 @@ async function saveBlobs(list) {   // [{ name, blob }]
 const saveFile = (name, text, mime) => saveBlobs([{ name, blob: new Blob([text], { type: mime }) }]);
 const stamp = () => today().replace(/-/g, '');
 $('#btnBackup').onclick = async () => {
-  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves };
+  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders };
   if (await saveFile(`家用進銷存備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
     await setMeta('lastBackup', Date.now()); toast('備份完成'); renderSet();
   }
@@ -1703,8 +1865,8 @@ $('#fileRestore').onchange = async e => {
   try { d = JSON.parse(await f.text()); } catch { toast('檔案格式錯誤'); return; }
   if (d.app !== 'homeinv' || !Array.isArray(d.items) || !Array.isArray(d.txns)) { toast('這不是家用進銷存的備份檔'); return; }
   if (!confirm(`用備份檔還原？\n物品 ${d.items.length} 筆、紀錄 ${d.txns.length} 筆\n目前手機上的資料會被取代。`)) return;
-  await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves'], 'readwrite', t => {
-    for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
+  await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'], 'readwrite', t => {
+    for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
   });
   await loadAll(); await migrateCusts(); await migrateAccts(); toast('還原完成'); show('home');
 };
@@ -1748,7 +1910,7 @@ $('#btnCsvStock').onclick = () => {
 $('#btnWipe').onclick = async () => {
   if (!confirm('清除這支手機上的全部資料？')) return;
   if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
-  await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'meta']) t.objectStore(s).clear(); });
+  await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta']) t.objectStore(s).clear(); });
   await loadAll(); await migrateAccts(); applyTheme(); toast('已清除'); show('home');
 };
 
