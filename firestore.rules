@@ -1,5 +1,5 @@
 rules_version = '2';
-// 家用進銷存 家庭雲端同步規則 (v2.3 起)
+// 家用進銷存 家庭雲端同步規則 (v2.3 起 ; v2.9 加公開型錄 catalogs)
 // 只有已加入的裝置 (devices 裡有自己的 uid) 才能讀寫家庭資料
 // 新裝置加入 : 家人給的協作者 ID (8 碼 , 當天有效 , 只能用一次) ; 用掉 ID 與加入裝置清單必須同一批寫入
 service cloud.firestore {
@@ -29,6 +29,21 @@ service cloud.firestore {
 
       match /recs/{rid} {
         allow read, write: if member(fid);
+      }
+    }
+
+    // 公開型錄 (v2.9 起) : 任何人可讀 (型錄網頁用) ; 只有家庭成員能寫 , 不能改成別的家庭 ; 不能列出
+    match /catalogs/{cid} {
+      allow get: if true;
+      allow create: if cid.matches('^[A-Z0-9]{12}$') && member(request.resource.data.fid);
+      allow update: if member(resource.data.fid) && request.resource.data.fid == resource.data.fid;
+      allow delete: if member(resource.data.fid);
+      allow list: if false;
+      match /p/{pid} {
+        allow get: if true;
+        allow write: if pid.matches('^[0-9]{1,3}$') && member(getAfter(/databases/$(database)/documents/catalogs/$(cid)).data.fid);
+        allow delete: if member(get(/databases/$(database)/documents/catalogs/$(cid)).data.fid);
+        allow list: if false;
       }
     }
 
