@@ -883,7 +883,7 @@ const Cloud = {
   }
 };
 // 同步完成提示 : 家人那邊傳來的變動先累計 , 伺服器確認後跳一次 (自己這台寫的不算)
-const SYNC = { t: {}, h: null };
+const SYNC = { t: {}, h: null, last: '' };
 function syncTally(r) { if (!r) return; const k = r.del ? 'del' : r.s === 'items' ? (r.nu ? 'newItem' : 'updItem') : r.s; SYNC.t[k] = (SYNC.t[k] || 0) + 1; }
 function syncMsg(t) {
   const a = [];
@@ -894,13 +894,15 @@ function syncMsg(t) {
   if (t.custs) a.push(`客戶 ${t.custs} 筆`);
   if (t.snaps) a.push(`庫存彙整 ${t.snaps} 份`);
   if (t.del) a.push(`刪除 ${t.del} 筆`);
-  const o = (t.shops || 0) + (t.accts || 0) + (t.meta || 0); if (o) a.push(`設定 ${o} 項`);
+  if (t.accts) a.push(`帳戶 ${t.accts} 個`);
+  if (t.shops) a.push(`店家 ${t.shops} 家`);
+  if (t.meta) a.push(`設定 ${t.meta} 項`);
   return a.length ? '已從雲端更新：' + a.join('、') : '';
 }
 function syncToast() {
   if (!Object.keys(SYNC.t).length) return;
   clearTimeout(SYNC.h);
-  SYNC.h = setTimeout(() => { const m = syncMsg(SYNC.t); SYNC.t = {}; if (m) toast(m, 4000); }, 600);
+  SYNC.h = setTimeout(() => { const m = syncMsg(SYNC.t); SYNC.t = {}; if (m) { SYNC.last = m; toast(m, 4000); } }, 1500);   // 家人連續輸入時合併成一次
 }
 // 套用雲端傳來的一筆資料 (只寫本機 , 不再上傳) ; 回傳 { s, nu 新增, del 刪除 } 給同步提示
 function applyRemote(key, d) {
