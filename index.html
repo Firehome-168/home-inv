@@ -362,7 +362,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.9.1</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.9.2</p>
   </section>
 </main>
 
@@ -2143,7 +2143,10 @@ function acctForm(id) {
     <label>備註</label><input id="a-note" value="${esc(a.note)}" placeholder="例：帳號末四碼、繳款日">
     <div class="btnrow" style="margin-top:14px">
       ${id ? '<button class="btn danger" id="a-del">刪除</button>' : ''}
-      <button class="btn ghost" id="a-cancel">取消</button><button class="btn" id="a-ok">儲存</button></div>`);
+      <button class="btn ghost" id="a-cancel">取消</button><button class="btn" id="a-ok">儲存</button></div>
+    ${id && S.accts.length > 1 ? `<div class="card small" style="margin-top:14px"><b>合併帳戶</b>
+      <div class="muted" style="margin:4px 0 8px">重複的帳戶：把「${esc(a.name)}」的全部紀錄 (${acctRecN(id)} 筆) 和期初餘額移到下面選的帳戶，再刪掉「${esc(a.name)}」。</div>
+      <div class="row"><select id="a-mto" class="grow">${S.accts.filter(x => x.id !== id).map(x => `<option value="${x.id}">${esc(x.name)} (${esc(x.type)})</option>`).join('')}</select><button class="btn ghost" id="a-merge">合併</button></div></div>` : ''}`);
   let type = a.type || '銀行';
   $('#a-type').onclick = e => {
     const b = e.target.closest('.chip'); if (!b) return; type = b.dataset.k;
@@ -2161,11 +2164,34 @@ function acctForm(id) {
   };
   if (id) $('#a-del').onclick = async () => {
     const n = S.txns.filter(t => t.acctId === id).length + S.moves.filter(m => m.acctId === id || m.toId === id).length;
-    if (n) { toast(`這個帳戶已有 ${n} 筆紀錄，不能刪除`); return; }
+    if (n) { toast(`這個帳戶已有 ${n} 筆紀錄，不能刪除，可用下面的「合併帳戶」`); return; }
     if (!confirm(`刪除帳戶「${a.name}」？`)) return;
     await DB.del('accts', id); S.accts = S.accts.filter(x => x.id !== id);
     closeSheet(); toast('已刪除'); render();
   };
+  if (id && $('#a-merge')) $('#a-merge').onclick = async () => {
+    const b = acctById(Number($('#a-mto').value)); if (!b) return;
+    if (!confirm(`把「${a.name}」合併到「${b.name}」？\n${acctRecN(id)} 筆紀錄和期初餘額 $${fmt(a.open)} 會移到「${b.name}」，然後刪除「${a.name}」。\n合併後無法復原，建議先備份。`)) return;
+    $('#a-merge').disabled = true; toast('合併中…');
+    const r = await acctMerge(id, b.id);
+    closeSheet(); toast(`已合併到「${b.name}」：移動 ${r.moved} 筆${r.self ? `，刪除兩帳戶互轉 ${r.self} 筆` : ''}`, 3500); render();
+  };
+}
+const acctRecN = id => S.txns.filter(t => t.acctId === id).length + S.moves.filter(m => m.acctId === id || m.toId === id).length;
+/* 合併帳戶 : from 的購入/銷售/收支/轉帳改到 to , 期初相加 , 刪除 from ; 兩帳戶互轉合併後變自己轉自己 , 直接刪除 (餘額不變) */
+async function acctMerge(fromId, toId) {
+  const a = acctById(fromId), b = acctById(toId); let moved = 0, self = 0;
+  for (const t of S.txns) if (t.acctId === fromId) { t.acctId = toId; if (t.pay === a.name) t.pay = b.name; await DB.put('txns', t); moved++; }
+  for (const m of [...S.moves]) if (m.acctId === fromId || m.toId === fromId) {
+    if (m.acctId === fromId) m.acctId = toId;
+    if (m.toId === fromId) m.toId = toId;
+    if (m.type === 'xfer' && m.acctId === m.toId) { await DB.del('moves', m.id); S.moves = S.moves.filter(x => x.id !== m.id); self++; }
+    else { await DB.put('moves', m); moved++; }
+  }
+  b.open = Math.round(((Number(b.open) || 0) + (Number(a.open) || 0)) * 100) / 100; await DB.put('accts', b);
+  if (S.meta.lastAcct === fromId) await setMeta('lastAcct', toId);
+  await DB.del('accts', fromId); S.accts = S.accts.filter(x => x.id !== fromId);
+  return { moved, self };
 }
 
 function acctDetail(id) {
