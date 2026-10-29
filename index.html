@@ -360,7 +360,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.6</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.7</p>
   </section>
 </main>
 
@@ -491,7 +491,8 @@ async function shareText(text) {
 const catUrl = /^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0] : (D.cat || '');
 if (catUrl) $('#shareCat').onclick = () => shareText(`${D.title} 商品型錄，歡迎選購\n${catUrl}`);
 else $('#shareCat').hidden = true;
-if (D.app) { $('#appBox').hidden = false; $('#appLink').href = D.app; }
+const appUrl = D.app || (/^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') : '');   // 型錄和 APP 放同一個資料夾
+if (appUrl) { $('#appBox').hidden = false; $('#appLink').href = appUrl; }
 
 document.title = D.title + ' 商品型錄';
 $('#ttl').textContent = D.title;
@@ -1860,8 +1861,9 @@ function catalogData() {
   return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(),
     app: base, cat: base && base + 'catalog.html', items };
 }
-// APP 所在網址 (GitHub Pages 資料夾) ; 本機檔案開啟時為空白
-const siteBase = () => /^https?:/.test(location.protocol) ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
+// APP 所在網址 (GitHub Pages 資料夾) ; 從電腦本機檔案開啟時用正式網址 (產生的型錄才有安裝/分享網址)
+const SITE_URL = 'https://firehome-168.github.io/home-inv/';
+const siteBase = () => /^https?:/.test(location.protocol) ? location.origin + location.pathname.replace(/[^/]*$/, '') : SITE_URL;
 const touchDev = () => isIOS || /Android/.test(navigator.userAgent);   // isIOS 在後面宣告 , 用函式延後取值
 // 分享文字 : 手機用分享選單 (可選 LINE) , 電腦複製到剪貼簿 (電腦的分享視窗找不到 LINE)
 async function shareText(text) {
