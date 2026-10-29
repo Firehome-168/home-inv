@@ -43,6 +43,8 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
 header{position:sticky;top:0;z-index:5;background:var(--bg);
   padding:calc(10px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:8px}
 header h1{font-size:20px;margin:0;flex:1}
+.cdot{font-size:20px;color:var(--muted);padding:0 4px;cursor:pointer}
+.cdot.on{color:#2f9c8f}
 .iconbtn{border:0;background:transparent;color:var(--ink);font-size:22px;width:40px;height:40px;border-radius:20px}
 .iconbtn:active{background:var(--line)}
 main{padding:0 16px 16px;max-width:720px;margin:0 auto}
@@ -58,6 +60,7 @@ main{padding:0 16px 16px;max-width:720px;margin:0 auto}
 .btn.ghost{background:var(--brand-soft);color:var(--ink)}
 .btn.out{background:var(--out);color:#fff}
 .btn.sale{background:var(--sale);color:#fff}
+.btn.line{background:#06c755;color:#fff}
 .btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
 .btn:disabled{opacity:.5}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap}
@@ -160,6 +163,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
 <body>
 <header>
   <h1 id="title">家用進銷存</h1>
+  <span id="cloudDot" class="cdot" hidden title="雲端同步">☁</span>
   <button class="iconbtn" id="btnSet" aria-label="設定">⚙</button>
 </header>
 <main>
@@ -303,6 +307,15 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <p class="small muted">顯示在首頁標題，例如「[你會紅]火龍果園」。空白則恢復「家用進銷存」。</p>
     </div>
     <div class="card">
+      <h2>分享 APP</h2>
+      <div class="btnrow"><button class="btn line" id="btnShareApp">分享 APP 網址給親友</button></div>
+      <p class="small muted">親友安裝後是自己獨立的帳本，資料只存在他們自己的手機，和你的資料不相通。要一起記帳請用下面的「家庭雲端同步」。</p>
+    </div>
+    <div class="card">
+      <h2>家庭雲端同步</h2>
+      <div id="cloudBox"></div>
+    </div>
+    <div class="card">
       <h2>資料備份</h2>
       <p class="small muted" id="bkInfo"></p>
       <div class="btnrow">
@@ -347,7 +360,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.1</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.4</p>
   </section>
 </main>
 
@@ -410,6 +423,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
 .btn.line{background:#06c755;color:#fff}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btnrow .btn{flex:1}
 .empty{color:var(--muted);text-align:center;padding:18px 0}
+a.btn{display:block;text-align:center;text-decoration:none}
 .seg{display:flex;gap:8px}.seg button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px;font:inherit}
 .seg button.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}.seg button:disabled{opacity:.35}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
@@ -441,6 +455,14 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
     <div class="btnrow"><button class="btn ghost" id="copy">複製訂單文字</button><button class="btn ghost" id="clr">清空購物車</button></div>
     <p class="small muted" id="how"></p>
   </section>
+  <section class="card" style="padding:14px">
+    <div class="btnrow" style="margin-top:0"><button class="btn ghost" id="shareCat">分享這個型錄給朋友</button></div>
+    <div id="appBox" hidden>
+      <p class="small" style="margin:14px 0 6px">也想記自己家裡的帳？免費安裝「家用進銷存」APP：購入、使用、庫存、收支都能記，資料只存在你自己的手機。</p>
+      <a class="btn ghost" id="appLink" target="_blank" rel="noopener">安裝家用進銷存 APP</a>
+      <p class="small muted" style="margin:6px 0 0">用手機開啟網址，iPhone 按 Safari 分享鈕「加入主畫面」，Android 按 Chrome 選單「安裝應用程式」(或「加到主畫面」)。</p>
+    </div>
+  </section>
 </main>
 <div class="bar"><div class="in"><div class="grow"><b id="tot"></b><div class="small muted" id="cnt"></div></div><button class="btn" id="go">填寫訂單</button></div></div>
 <div id="zoom"><img alt=""></div>
@@ -459,6 +481,17 @@ function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('o
 function save() { try { localStorage.setItem(LS, JSON.stringify({ cart, nm: $('#nm').value, ph: $('#ph').value, ad: $('#ad').value, ship, pay })); } catch (e) { } }
 try { const s = JSON.parse(localStorage.getItem(LS) || '{}'); cart = s.cart || {}; $('#nm').value = s.nm || ''; $('#ph').value = s.ph || ''; $('#ad').value = s.ad || ''; ship = s.ship || '自取'; pay = s.pay || '現金'; } catch (e) { }
 for (const k of Object.keys(cart)) { const it = byId(Number(k)); if (!it || it.q <= 0) delete cart[k]; else if (cart[k] > it.q) cart[k] = it.q; }
+
+// 分享 : 手機用分享選單 (可選 LINE) , 電腦複製到剪貼簿
+const touchDev = /Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+async function shareText(text) {
+  if (touchDev && navigator.share) { try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(text); toast('已複製，可貼到 LINE'); } catch (e) { prompt('複製', text); }
+}
+const catUrl = /^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0] : (D.cat || '');
+if (catUrl) $('#shareCat').onclick = () => shareText(`${D.title} 商品型錄，歡迎選購\n${catUrl}`);
+else $('#shareCat').hidden = true;
+if (D.app) { $('#appBox').hidden = false; $('#appLink').href = D.app; }
 
 document.title = D.title + ' 商品型錄';
 $('#ttl').textContent = D.title;
@@ -559,6 +592,7 @@ chips(); list(); segUI();
 </html>
 </script>
 
+<script src="firebase-config.js"></script>
 <script>
 'use strict';
 /* ========== 常數 ========== */
@@ -612,16 +646,27 @@ const DB = {
       r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error);
     });
   },
+  // 新資料用全域唯一編號 (時間+亂數) , 多台裝置同時新增也不會撞號 ; 寫入本機後同步上傳雲端
   async put(store, obj) {
+    if (store !== 'meta' && obj.id == null) obj.id = newId();
+    const r = await this._put(store, obj);
+    Cloud.push(store, obj);
+    return r;
+  },
+  async del(store, id) {
+    await this._del(store, id);
+    Cloud.push(store, { id }, true);
+  },
+  async _put(store, obj) {
     await this.open();
     return new Promise((ok, bad) => {
       const t = this.db.transaction(store, 'readwrite');
       const r = t.objectStore(store).put(obj);
-      r.onsuccess = () => { obj.id = obj.id ?? r.result; };
+      if (store !== 'meta') r.onsuccess = () => { obj.id = obj.id ?? r.result; };
       t.oncomplete = () => ok(r.result); t.onerror = () => bad(t.error);
     });
   },
-  async del(store, id) {
+  async _del(store, id) {
     await this.open();
     return new Promise((ok, bad) => {
       const t = this.db.transaction(store, 'readwrite');
@@ -630,6 +675,8 @@ const DB = {
     });
   }
 };
+
+const newId = (() => { let last = 0; return () => (last = Math.max(last + 1, (Date.now() - 1.6e12) * 10000 + Math.floor(Math.random() * 10000))); })();
 
 /* ========== 狀態 ========== */
 const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], orders: [], ordFilter: '處理中', meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
@@ -650,6 +697,226 @@ function applyAppName() {
   $('#verName').textContent = n;
   if (S.view === 'home') $('#title').textContent = n;
 }
+
+/* ========== 家庭雲端同步 (Firebase Firestore) ==========
+   每台裝置匿名登入 ; 只有家庭裝置清單裡的裝置能讀寫 (firestore.rules 把關)
+   新裝置加入 : 家人產生「協作者 ID」(8 碼 , 當天有效 , 只能用一次) , 通行密碼 = ID + 今天月日 4 碼
+   本機 IndexedDB 仍保留一份 (離線照常記帳 , 連線後自動補傳)
+   雲端路徑 : families/{代碼}            家庭 { name , devices{uid:{name,at,inv}} , inv{ID:{name,exp}} }
+             families/{代碼}/recs/{表_id} 資料 { s:表 , j:JSON , del:刪除 , t:伺服器時間 , by , ss }
+             invites/{ID}                 協作者 ID { fid , name , by , exp , used , usedBy }
+   增量同步 : 只讀 t 大於上次同步時間的資料 (刪除用 del 標記 , 不真的刪文件) */
+const LOCAL_META = ['theme', 'lastBackup', 'lastAcct', 'lastCarrier'];   // 每台裝置自己的設定 , 不同步
+const STORES = ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'];
+const FB_VER = '10.12.2';
+const lsG = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+const lsS = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { } };
+const newFamCode = (n = 10) => Array.from(crypto.getRandomValues(new Uint8Array(n)), x => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[x % 32]).join('');
+const Cloud = {
+  cfg: window.FB_CONFIG && window.FB_CONFIG.apiKey ? window.FB_CONFIG : null,
+  fb: null, F: null, uid: '', ss: Math.random().toString(36).slice(2, 10),
+  unsub: [], fam: null, err: '', loading: null, rTimer: null, synced: 0,
+  get fid() { return lsG('cloud_fid'); },
+  get on() { return lsG('cloud_state') === 'on' && !!this.fid; },
+  docKey(store, o) { return store + '_' + (store === 'meta' ? o.k : o.id); },
+  async load() {
+    if (!this.cfg) throw new Error('尚未設定 firebase-config.js');
+    if (this.fb) return this.fb;
+    return this.loading = this.loading || (async () => {
+      const b = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+      const [A, U, F] = await Promise.all([import(b + 'firebase-app.js'), import(b + 'firebase-auth.js'), import(b + 'firebase-firestore.js')]);
+      const app = A.initializeApp(this.cfg);
+      const auth = U.getAuth(app);
+      let db;
+      try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+      catch (e) { db = F.getFirestore(app); }
+      if (this.cfg.emulator) {   // 測試用 : 本機模擬器
+        U.connectAuthEmulator(auth, 'http://' + this.cfg.emulator.auth, { disableWarnings: true });
+        const [h, p] = this.cfg.emulator.firestore.split(':'); F.connectFirestoreEmulator(db, h, Number(p));
+      }
+      await new Promise(ok => { const u = U.onAuthStateChanged(auth, () => { u(); ok(); }); });
+      if (!auth.currentUser) await U.signInAnonymously(auth);
+      this.uid = auth.currentUser.uid; this.F = F;
+      return this.fb = { app, auth, db };
+    })().catch(e => { this.loading = null; throw e; });
+  },
+  famRef(code = this.fid) { return this.F.doc(this.fb.db, 'families', code); },
+  recRef(key, code = this.fid) { return this.F.doc(this.fb.db, 'families', code, 'recs', key); },
+  // 開機 : 已加入就開始同步
+  async boot() {
+    updDot();
+    if (!this.cfg || !this.on) return;
+    try { await this.load(); } catch (e) { this.err = '雲端連線失敗，稍後自動重試'; updDot(); return; }
+    this.start();
+  },
+  stop() { this.unsub.forEach(u => { try { u(); } catch (e) { } }); this.unsub = []; },
+  // 建立家庭 : 本機資料上傳成為家庭資料
+  async create(devName, famName) {
+    await this.load();
+    const code = newFamCode();
+    await this.F.setDoc(this.famRef(code), { name: famName, created: Date.now(), devices: { [this.uid]: { name: devName, at: Date.now() } } });
+    lsS('cloud_fid', code); lsS('cloud_state', 'on'); lsS('cloud_last_' + code, '');
+    await this.uploadAll();
+    this.start();
+  },
+  invRef(iid) { return this.F.doc(this.fb.db, 'invites', iid); },
+  // 加入家庭 : 協作者 ID 有效就加入 (ID 標成已用 + 加入裝置清單 同一批寫入) , 本機資料改用家庭資料
+  async join(iid) {
+    await this.load();
+    const F = this.F, bad = '協作者 ID 無效、已用過或已過期，請向家人重新索取';
+    let iv = null;
+    try { const snap = await F.getDoc(this.invRef(iid)); if (snap.exists()) iv = snap.data(); } catch (e) { }
+    if (!iv) throw new Error(bad);
+    const b = F.writeBatch(this.fb.db);
+    b.update(this.invRef(iid), { used: true, usedBy: this.uid, usedAt: F.serverTimestamp() });
+    b.update(this.famRef(iv.fid), { ['devices.' + this.uid]: { name: iv.name, at: Date.now(), inv: iid } });
+    try { await b.commit(); } catch (e) { throw new Error(bad); }
+    this.stop();
+    await localWipe();
+    lsS('cloud_name', iv.name); lsS('cloud_fid', iv.fid); lsS('cloud_state', 'on'); lsS('cloud_last_' + iv.fid, '');
+    this.start();
+    return iv.name;
+  },
+  // 新增協作者 : 產生 8 碼 ID , 今天 23:59:59 到期 , 只能用一次
+  async invite(name) {
+    const F = this.F, iid = newFamCode(8), e = new Date(); e.setHours(23, 59, 59, 0);
+    await F.setDoc(this.invRef(iid), { fid: this.fid, name, by: this.uid, exp: F.Timestamp.fromDate(e), used: false });
+    await F.updateDoc(this.famRef(), { ['inv.' + iid]: { name, exp: e.getTime() } });
+    return iid;
+  },
+  async cancelInvite(iid) {
+    const F = this.F;
+    await F.deleteDoc(this.invRef(iid)).catch(() => { });
+    await F.updateDoc(this.famRef(), { ['inv.' + iid]: F.deleteField() });
+  },
+  // 尚未使用、今天有效的協作者 ID
+  pending() {
+    const f = this.fam || {}, used = new Set(Object.values(f.devices || {}).map(d => d.inv).filter(Boolean));
+    return Object.entries(f.inv || {}).filter(([k, v]) => v.exp > Date.now() && !used.has(k)).sort((a, b) => a[1].exp - b[1].exp);
+  },
+  removeDevice(uid) { return this.F.updateDoc(this.famRef(), { ['devices.' + uid]: this.F.deleteField() }); },
+  leave(msg) {
+    const F = this.F, fid = this.fid;
+    if (F && fid && this.fam && this.fam.devices && this.fam.devices[this.uid])
+      F.updateDoc(this.famRef(), { ['devices.' + this.uid]: F.deleteField() }).catch(() => { });
+    this.stop(); this.fam = null;
+    lsS('cloud_state', ''); lsS('cloud_fid', ''); lsS('cloud_last_' + fid, ''); lsS('cloud_outbox_' + fid, '');
+    if (msg) toast(msg);
+    updDot(); if (S.view === 'set') renderSet();
+  },
+  // 開始同步 : 監聽 t > 上次同步時間 的資料 ; 家庭資訊 (裝置清單 / 協作者 ID)
+  start() {
+    const F = this.F, fid = this.fid; this.stop(); this.err = '';
+    const last = Number(lsG('cloud_last_' + fid) || 0);
+    const q = F.query(F.collection(this.fb.db, 'families', fid, 'recs'), F.where('t', '>', F.Timestamp.fromMillis(Math.max(0, last - 300000))));
+    this.unsub.push(F.onSnapshot(q, { includeMetadataChanges: true }, snap => {   // 含「已與伺服器確認」事件 , 才知道同步完成
+      let maxT = Number(lsG('cloud_last_' + fid) || 0), n = 0;
+      for (const ch of snap.docChanges()) {
+        if (ch.type === 'removed') continue;                  // 只是不在查詢範圍 (例如本機剛改 , 時間尚未確定)
+        const d = ch.doc.data();
+        if (d.t && d.t.toMillis) maxT = Math.max(maxT, d.t.toMillis());
+        if (ch.doc.metadata.hasPendingWrites || d.ss === this.ss) continue;   // 自己這次開啟寫的
+        applyRemote(ch.doc.id, d); n++;
+      }
+      if (!snap.metadata.fromCache) {   // 伺服器確認 : 記下同步到哪個時間 , 下次只讀之後的變動
+        for (const d of snap.docs) { const t = d.get('t'); if (t && t.toMillis) maxT = Math.max(maxT, t.toMillis()); }
+        lsS('cloud_last_' + fid, String(maxT)); this.synced = Date.now();
+      }
+      this.err = '';
+      if (n) scheduleRender();
+      updDot(); if (S.view === 'set') renderCloud();
+    }, e => this.fail(e)));
+    this.unsub.push(F.onSnapshot(this.famRef(), snap => {
+      if (snap.metadata.fromCache && !snap.exists()) return;
+      this.fam = snap.exists() ? snap.data() : null;
+      if (!this.fam || !this.fam.devices || !this.fam.devices[this.uid]) { this.leave('這台已不在家庭帳本裡 (可能被家人移除)'); return; }
+      // 清掉已用過或已過期的協作者 ID
+      const live = new Set(this.pending().map(p => p[0])), old = Object.keys(this.fam.inv || {}).filter(k => !live.has(k));
+      if (old.length) F.updateDoc(this.famRef(), Object.fromEntries(old.map(k => ['inv.' + k, F.deleteField()]))).catch(() => { });
+      if (S.view === 'set') renderCloud();
+    }, e => { if (e && e.code === 'permission-denied') this.leave('這台已被家人移出家庭帳本'); else this.fail(e); }));
+    this.flush();
+    updDot();
+  },
+  fail(e) { this.err = (e && (e.code === 'permission-denied' ? '雲端拒絕存取 (請確認 firestore.rules 已發布)' : e.message)) || '同步錯誤'; updDot(); if (S.view === 'set') renderCloud(); },
+  // 本機寫入後上傳 (雲端還沒準備好就先記在待傳清單)
+  push(store, o, del) {
+    if (!this.on || (store === 'meta' && LOCAL_META.includes(o.k))) return;
+    const key = this.docKey(store, o);
+    if (!this.fb) { this.outbox(key); return; }
+    const F = this.F;
+    F.setDoc(this.recRef(key), { s: store, j: del ? '' : JSON.stringify(o), del: !!del, t: F.serverTimestamp(), by: this.uid, ss: this.ss })
+      .catch(e => { this.outbox(key); this.fail(e); });
+  },
+  outbox(key) {
+    const k = 'cloud_outbox_' + this.fid, a = new Set(JSON.parse(lsG(k) || '[]')); a.add(key); lsS(k, JSON.stringify([...a]));
+  },
+  flush() {
+    const k = 'cloud_outbox_' + this.fid, a = JSON.parse(lsG(k) || '[]'); if (!a.length) return;
+    lsS(k, '');
+    for (const key of a) {
+      const i = key.indexOf('_'), store = key.slice(0, i), id = key.slice(i + 1);
+      if (store === 'meta') { if (id in S.meta) this.push('meta', { k: id, v: S.meta[id] }); else this.push('meta', { k: id }, true); continue; }
+      const o = (S[store] || []).find(x => String(x.id) === id);
+      this.push(store, o || { id: Number(id) }, !o);
+    }
+  },
+  // 整批上傳 (建立家庭 / 換代碼 / 還原備份) ; dels = 要標記刪除的 key
+  async uploadAll(dels = []) {
+    const F = this.F, recs = [];
+    for (const s of STORES) for (const o of S[s]) recs.push([this.docKey(s, o), { s, j: JSON.stringify(o), del: false }]);
+    for (const [k, v] of Object.entries(S.meta)) if (!LOCAL_META.includes(k)) recs.push(['meta_' + k, { s: 'meta', j: JSON.stringify({ k, v }), del: false }]);
+    const keep = new Set(recs.map(r => r[0]));
+    for (const k of dels) if (!keep.has(k)) recs.push([k, { s: k.slice(0, k.indexOf('_')), j: '', del: true }]);
+    for (let i = 0; i < recs.length; i += 400) {
+      const b = F.writeBatch(this.fb.db);
+      for (const [k, v] of recs.slice(i, i + 400)) b.set(this.recRef(k), { ...v, t: F.serverTimestamp(), by: this.uid, ss: this.ss });
+      await b.commit();
+    }
+  },
+  allKeys() {
+    const a = [];
+    for (const s of STORES) for (const o of S[s]) a.push(this.docKey(s, o));
+    for (const k of Object.keys(S.meta)) if (!LOCAL_META.includes(k)) a.push('meta_' + k);
+    return a;
+  }
+};
+// 套用雲端傳來的一筆資料 (只寫本機 , 不再上傳)
+function applyRemote(key, d) {
+  const s = d.s, id = key.slice(s.length + 1);
+  if (s === 'meta') {
+    if (LOCAL_META.includes(id)) return;
+    if (d.del) { delete S.meta[id]; DB._del('meta', id); }
+    else { const o = JSON.parse(d.j); S.meta[o.k] = o.v; DB._put('meta', o); if (o.k === 'appName') applyAppName(); }
+    return;
+  }
+  if (!STORES.includes(s)) return;
+  const nid = Number(id);
+  if (d.del) { S[s] = S[s].filter(x => x.id !== nid); DB._del(s, nid); return; }
+  const o = JSON.parse(d.j), i = S[s].findIndex(x => x.id === o.id);
+  if (i >= 0) S[s][i] = o; else S[s].push(o);
+  DB._put(s, o);
+}
+function scheduleRender() { clearTimeout(Cloud.rTimer); Cloud.rTimer = setTimeout(() => { render(); }, 200); }
+// 清空本機資料 (不動雲端) ; 保留本機設定
+async function localWipe() {
+  const keep = Object.fromEntries(Object.entries(S.meta).filter(([k]) => LOCAL_META.includes(k)));
+  await DB.tx([...STORES, 'meta'], 'readwrite', t => {
+    for (const s of [...STORES, 'meta']) t.objectStore(s).clear();
+    for (const [k, v] of Object.entries(keep)) t.objectStore('meta').put({ k, v });
+  });
+  await loadAll(); render();
+}
+function updDot() {
+  const d = $('#cloudDot'); if (!d) return;
+  d.hidden = !Cloud.cfg || !Cloud.on;
+  const ok = Cloud.on && Cloud.fb && !Cloud.err && navigator.onLine;
+  d.className = 'cdot' + (ok ? ' on' : '');
+  d.title = ok ? '雲端同步中' : (Cloud.err || '離線，連線後自動同步');
+}
+window.addEventListener('online', () => { updDot(); if (Cloud.on && !Cloud.fb) Cloud.boot(); });
+window.addEventListener('offline', updDot);
+
 const itemById = id => S.items.find(x => x.id === id);
 const custById = id => S.custs.find(x => x.id === id);
 const custName = t => (custById(t.custId) || {}).name || t.to || '';
@@ -1495,8 +1762,19 @@ function catalogData() {
   const items = S.items.filter(it => !it.noStock && it.sp > 0)
     .sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant'))
     .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, im: it.img || '', q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).filter(r => !r.to || r.to >= today()).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
-  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(), items };
+  const base = siteBase();
+  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(),
+    app: base, cat: base && base + 'catalog.html', items };
 }
+// APP 所在網址 (GitHub Pages 資料夾) ; 本機檔案開啟時為空白
+const siteBase = () => /^https?:/.test(location.protocol) ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
+const touchDev = () => isIOS || /Android/.test(navigator.userAgent);   // isIOS 在後面宣告 , 用函式延後取值
+// 分享文字 : 手機用分享選單 (可選 LINE) , 電腦複製到剪貼簿 (電腦的分享視窗找不到 LINE)
+async function shareText(text) {
+  if (touchDev() && navigator.share) { try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(text); toast('已複製，可貼到 LINE'); } catch (e) { prompt('複製下面的文字', text); }
+}
+const appShareText = () => `推薦「家用進銷存」APP：購入、使用、庫存、收支都能記，資料只存在自己的手機。\n用手機開啟網址，iPhone 按 Safari 分享鈕「加入主畫面」，Android 按 Chrome 選單「安裝應用程式」(或「加到主畫面」)：\n${siteBase()}`;
 function catalogHtml() {
   const json = JSON.stringify(catalogData()).replace(/</g, '\\u003c');
   return $('#catTpl').textContent.trim().replace('__DATA__', () => json).split('<\\/script>').join('</' + 'script>');
@@ -1513,10 +1791,11 @@ function catalogForm() {
     <label>轉帳帳號 (會員選轉帳時顯示)</label><textarea id="g-bank" placeholder="例：台灣銀行 (004) 123-456-789012 戶名 王小明">${esc(S.meta.catBank || '')}</textarea>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="g-qty" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowQty ? 'checked' : ''}> 顯示剩餘數量</label>
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
-    <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button></div>
+    <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button><button class="btn line" id="g-share">分享型錄網址</button></div>
     <p class="small muted">電腦會存到「下載」資料夾 (iPhone 用分享選單存到「檔案」)。把 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
     「型錄圖片」只列有庫存的商品 (每張 8 項)，含照片、價格、優惠及下單網址，可直接貼到 LINE 群組。<br>
     會員選好商品按「用 LINE 傳送訂單」，你收到後在銷售頁按「貼上會員訂單」就會轉進收銀。<br>
+    「分享型錄網址」把 …/catalog.html 的網址用 LINE 傳給會員 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
     售價、庫存有變動時，重新下載上傳一次即可。</p>`);
   const keep = async () => {
     await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim());
@@ -1534,6 +1813,10 @@ function catalogForm() {
     if (await saveFile('catalog.html', catalogHtml(), 'text/html')) toast(isIOS ? '型錄已產生' : 'catalog.html 已存到「下載」資料夾');
   };
   $('#g-jpg').onclick = async () => { await keep(); toast('產生中…'); await catalogJpg(); };
+  $('#g-share').onclick = async () => {
+    const base = siteBase(); if (!base) { toast('請從網站開啟 APP 才能分享網址'); return; }
+    await keep(); await shareText(`${S.meta.catTitle || '家用小舖'} 商品型錄，歡迎選購\n${base}catalog.html`);
+  };
 }
 
 /* ========== 商品照片 : 縮成最長邊 640px JPEG (dataURL) 存在物品 img ========== */
@@ -1835,6 +2118,7 @@ function renderSet() {
     <button class="iconbtn" data-shop-ren="${s.id}" aria-label="改名">✎</button><button class="iconbtn" data-shop-del="${s.id}" aria-label="刪除">✕</button></li>`).join('') || '<li class="empty">購入時輸入店家會自動加入</li>';
   $('#themeSel').value = S.meta.theme || '';
   $('#appNameIn').value = S.meta.appName || '';
+  renderCloud();
   if (navigator.storage && navigator.storage.persisted)
     navigator.storage.persisted().then(p => { $('#storeInfo').textContent = p ? '資料已設為永久保存。' : '瀏覽器尚未保證永久保存，安裝到主畫面後較不會被清除。'; });
 }
@@ -1849,6 +2133,81 @@ $('#btnShopAdd').onclick = async () => {
   if (S.shops.some(s => s.name === nm)) { toast('已有這個店家'); return; }
   const s = { name: nm }; s.id = await DB.put('shops', s); S.shops.push(s); $('#shopNew').value = ''; renderSet();
 };
+// 加入驗證碼 : 日日分分 (例 28 日 19:37 → 2837) , 前後 2 分鐘內都算對 (手機時間誤差)
+// 通行密碼後 4 碼 = 今天 月月日日
+const todayMD = () => { const t = new Date(), p2 = n => String(n).padStart(2, '0'); return p2(t.getMonth() + 1) + p2(t.getDate()); };
+function inviteText(iid, name) {
+  const url = siteBase() || location.href.split('?')[0];
+  return `邀請「${name}」加入「${Cloud.fam ? Cloud.fam.name : appName()}」家庭帳本\n1. 用手機開啟 ${url}\n2. 到「設定 > 家庭雲端同步」\n3. 通行密碼輸入：${iid} 再接上今天月日 4 碼 (例 10 月 29 日 → ${iid}1029)\n協作者 ID 只限今天、只能用一次。`;
+}
+const shareInvite = (iid, name) => shareText(inviteText(iid, name));
+function renderCloud() {
+  const b = $('#cloudBox'); if (!b) return;
+  if (!Cloud.cfg) { b.innerHTML = '<p class="small muted">尚未設定雲端。需先建立 Firebase 專案並填入 firebase-config.js (見 README 說明)。</p>'; return; }
+  if (!Cloud.on) {
+    b.innerHTML = `<label>通行密碼</label><div class="row"><input id="cl-pass" class="grow" maxlength="12" placeholder="協作者 ID 8 碼 + 月月日日" autocapitalize="characters" autocomplete="off"><button class="btn" id="cl-join">加入家庭</button></div>
+      <p class="small muted">向家人索取「協作者 ID」(只限今天、只能用一次)，後面接上今天月日 4 碼 (例 10 月 29 日 → 1029)，按「加入家庭」。</p>
+      <h3 style="margin:14px 0 4px">第一台：建立家庭帳本</h3>
+      <label>這台裝置名稱</label><input id="cl-name" value="${esc(lsG('cloud_name'))}" maxlength="20" placeholder="例如 爸爸手機">
+      <div class="btnrow" style="margin-top:10px"><button class="btn ghost" id="cl-create">建立家庭帳本</button></div>
+      <p class="small muted">這台的資料上傳成為家庭資料，再到這裡「新增協作者」給家人。</p>`;
+    return;
+  }
+  const f = Cloud.fam, devs = f && f.devices ? Object.entries(f.devices).sort((a, b) => a[1].at - b[1].at) : [];
+  const pend = Cloud.pending();
+  const stat = Cloud.err ? Cloud.err : !navigator.onLine ? '離線中，資料先存在這台，連線後自動同步' :
+    Cloud.synced ? '已同步 ' + new Date(Cloud.synced).toLocaleTimeString('zh-TW', { hour12: false }) : '連線中…';
+  b.innerHTML = `<p><b>${esc(f ? f.name : '')}</b></p>
+    <p class="small muted">${esc(stat)}</p>
+    <h3 style="margin:14px 0 4px">新增協作者</h3>
+    <div class="row"><input id="cl-iname" class="grow" maxlength="20" placeholder="家人裝置名稱，例如 媽媽手機"><button class="btn" id="cl-inv">產生協作者 ID</button></div>
+    <p class="small muted">協作者 ID 只限今天、只能用一次。傳給家人後，對方輸入「ID + 今天月日」就加入。</p>
+    ${pend.length ? `<ul class="list">${pend.map(([k, v]) => `<li><div class="grow">${esc(v.name)}<div class="small muted">協作者 ID <b>${esc(k)}</b>　今天有效，尚未使用</div></div>
+      <button class="btn ghost" data-share="${esc(k)}">傳送</button><button class="btn ghost" data-cancel="${esc(k)}">取消</button></li>`).join('')}</ul>` : ''}
+    <h3 style="margin:14px 0 4px">已加入的裝置</h3>
+    <ul class="list">${devs.map(([u, m]) => `<li><div class="grow">${esc(m.name)}${u === Cloud.uid ? ' <span class="small muted">(這台)</span>' : ''}</div>${u === Cloud.uid ? '' : `<button class="btn ghost" data-rm="${esc(u)}">移除</button>`}</li>`).join('') || '<li class="empty">連線中…</li>'}</ul>
+    <p class="small muted">手機遺失或不再使用，請按「移除」，那台立刻無法再讀取家庭資料。</p>
+    <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="cl-leave">這台離開家庭</button></div>`;
+}
+$('#cloudBox').onclick = async e => {
+  const t = e.target.closest('button'); if (!t) return;
+  const id = t.id;
+  try {
+    if (id === 'cl-create') {
+      const n = (($('#cl-name') || {}).value || '').trim(); if (!n) { toast('請輸入這台裝置名稱'); return; }
+      if (!confirm(`建立「${appName()}」家庭帳本？\n這台的資料 (物品 ${S.items.length}、紀錄 ${S.txns.length + S.moves.length} 筆) 會上傳到雲端。`)) return;
+      lsS('cloud_name', n); t.disabled = true; toast('建立中…');
+      await Cloud.create(n, appName()); toast('家庭帳本已建立，可新增協作者給家人'); renderSet();
+    } else if (id === 'cl-join') {
+      const raw = ($('#cl-pass').value || '').replace(/\s/g, '').toUpperCase();
+      if (!/^[A-Z0-9]{8}\d{4}$/.test(raw)) { toast('請輸入 協作者 ID 8 碼 + 今天月日 4 碼'); return; }
+      if (raw.slice(8) !== todayMD()) { toast('通行密碼不正確 (後 4 碼是今天月日，例 10 月 29 日 → 1029)'); return; }
+      const cnt = S.items.length + S.txns.length + S.moves.length;
+      if (cnt && !confirm(`這台已有 ${cnt} 筆資料。\n加入後改用家庭的資料，這台原有資料會清除。\n如需保留請先按「備份匯出」。\n確定加入？`)) return;
+      t.disabled = true; toast('加入中…');
+      const n = await Cloud.join(raw.slice(0, 8)); toast(`已加入家庭 (${n})，開始同步`); renderSet();
+    } else if (id === 'cl-inv') {
+      const n = ($('#cl-iname').value || '').trim(); if (!n) { toast('請輸入家人裝置名稱'); return; }
+      t.disabled = true;
+      const iid = await Cloud.invite(n); renderCloud();
+      await shareInvite(iid, n);
+    } else if (t.dataset.share) {
+      const p = Cloud.pending().find(x => x[0] === t.dataset.share); if (p) await shareInvite(p[0], p[1].name);
+    } else if (t.dataset.cancel) {
+      if (!confirm('取消這個協作者 ID？')) return;
+      t.disabled = true; await Cloud.cancelInvite(t.dataset.cancel); toast('已取消');
+    } else if (t.dataset.rm) {
+      const m = (Cloud.fam.devices || {})[t.dataset.rm] || {};
+      if (!confirm(`移除「${m.name || ''}」？\n那台會立刻停止同步，不能再讀取家庭資料。`)) return;
+      t.disabled = true; await Cloud.removeDevice(t.dataset.rm); toast('已移除');
+    } else if (id === 'cl-leave') {
+      if (!confirm('這台離開家庭？\n這台的資料保留，但不再與家人同步。')) return;
+      Cloud.leave('已離開家庭');
+    }
+  } catch (err) { toast('雲端操作失敗：' + (err.message || err)); t.disabled = false; }
+};
+$('#cloudDot').onclick = () => show('set');
+$('#btnShareApp').onclick = () => siteBase() ? shareText(appShareText()) : toast('請從網站開啟 APP 才能分享網址');
 $('#btnAppName').onclick = async () => {
   await setMeta('appName', $('#appNameIn').value.trim()); applyAppName(); toast('已儲存 APP 名稱');
 };
@@ -1886,12 +2245,14 @@ $('#fileRestore').onchange = async e => {
   let d;
   try { d = JSON.parse(await f.text()); } catch { toast('檔案格式錯誤'); return; }
   if (d.app !== 'homeinv' || !Array.isArray(d.items) || !Array.isArray(d.txns)) { toast('這不是家用進銷存的備份檔'); return; }
-  if (!confirm(`用備份檔還原？\n物品 ${d.items.length} 筆、紀錄 ${d.txns.length} 筆\n目前手機上的資料會被取代。`)) return;
+  if (!confirm(`用備份檔還原？\n物品 ${d.items.length} 筆、紀錄 ${d.txns.length} 筆\n目前${Cloud.on ? '全部家人' : '手機上'}的資料會被取代。`)) return;
+  const prevKeys = Cloud.on ? Cloud.allKeys() : [];
   await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'], 'readwrite', t => {
     for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
   });
   await loadAll(); await migrateCusts(); await migrateAccts();
   if (d.appName) await setMeta('appName', d.appName);   // 備份檔帶自訂 APP 名稱
+  if (Cloud.on) { toast('上傳到家庭雲端中…'); await Cloud.uploadAll(prevKeys); }
   applyAppName(); toast('還原完成'); show('home');
 };
 function csv(rows) { return '﻿' + rows.map(r => r.map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n'); }
@@ -1932,10 +2293,13 @@ $('#btnCsvStock').onclick = () => {
   saveFile(`${appName()}庫存_${stamp()}.csv`, csv(rows), 'text/csv');
 };
 $('#btnWipe').onclick = async () => {
-  if (!confirm('清除這支手機上的全部資料？')) return;
+  if (!confirm(Cloud.on ? '清除全部家人的家庭資料？(雲端也會清除)' : '清除這支手機上的全部資料？')) return;
   if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
+  const prevKeys = Cloud.on ? Cloud.allKeys() : [];
   await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta']) t.objectStore(s).clear(); });
-  await loadAll(); await migrateAccts(); applyTheme(); applyAppName(); toast('已清除'); show('home');
+  await loadAll(); await migrateAccts();
+  if (Cloud.on) await Cloud.uploadAll(prevKeys);
+  applyTheme(); applyAppName(); toast('已清除'); show('home');
 };
 
 /* ========== 掃條碼 (Android Chrome 支援 BarcodeDetector ; 不支援時改手動輸入) ========== */
@@ -1976,7 +2340,8 @@ async function migrateAccts() {
   const map = { 現金: '現金', 信用卡: '信用卡', 行動支付: '行動支付', 轉帳: '銀行帳戶' };
   for (const t of S.txns) if ((t.type === 'in' || t.type === 'sale') && !acctById(t.acctId)) {   // 沒帳戶或帳戶已不存在 (還原舊備份)
     const a = S.accts.find(x => x.name === map[t.pay]) || S.accts.find(x => x.type === '現金') || S.accts[0];
-    t.acctId = a.id; t.pay = a.name; await DB.put('txns', t);
+    t.acctId = a.id; t.pay = a.name;
+    await (Cloud.on ? DB._put('txns', t) : DB.put('txns', t));   // 家庭同步中只改本機 : 各台自己補 , 不回寫雲端 (以免蓋掉家人的修改或刪除) ; 還原備份另外整批上傳
   }
 }
 
@@ -1987,6 +2352,8 @@ async function migrateAccts() {
   applyTheme(); applyAppName();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
+  if (location.search.includes('family=')) history.replaceState(null, '', location.pathname);   // 舊版邀請連結已停用
+  Cloud.boot();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>

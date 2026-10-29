@@ -1,0 +1,50 @@
+rules_version = '2';
+// 家用進銷存 家庭雲端同步規則 (v2.3 起)
+// 只有已加入的裝置 (devices 裡有自己的 uid) 才能讀寫家庭資料
+// 新裝置加入 : 家人給的協作者 ID (8 碼 , 當天有效 , 只能用一次) ; 用掉 ID 與加入裝置清單必須同一批寫入
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function famDoc(fid) { return get(/databases/$(database)/documents/families/$(fid)); }
+    function member(fid) { return signed() && request.auth.uid in famDoc(fid).data.devices; }
+    function invPath(iid) { return /databases/$(database)/documents/invites/$(iid); }
+
+    // 用協作者 ID 加入 : 只能新增自己這一台 , ID 屬於這個家庭、未用過、未過期 , 且同批把 ID 標成自己用掉
+    function joining(fid) {
+      let me = request.auth.uid;
+      let iid = request.resource.data.devices[me].inv;
+      let iv = get(invPath(iid)).data;
+      return signed() && !(me in resource.data.devices)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+        && request.resource.data.devices.diff(resource.data.devices).affectedKeys().hasOnly([me])
+        && iv.fid == fid && iv.used == false && request.time < iv.exp
+        && getAfter(invPath(iid)).data.usedBy == me;
+    }
+
+    match /families/{fid} {
+      allow get: if member(fid);
+      allow create: if signed() && fid.matches('^[A-Z0-9]{10}$') && request.resource.data.devices.keys().hasOnly([request.auth.uid]);
+      allow update: if member(fid) || joining(fid);
+      allow list, delete: if false;
+
+      match /recs/{rid} {
+        allow read, write: if member(fid);
+      }
+    }
+
+    // 協作者 ID : 家人 (已加入的裝置) 產生 , 當天有效 (24 小時內到期) ; 不能列出 (猜不到)
+    match /invites/{iid} {
+      allow get: if signed() && resource.data.used == false && request.time < resource.data.exp;
+      allow create: if iid.matches('^[A-Z0-9]{8}$') && member(request.resource.data.fid)
+        && request.resource.data.keys().hasOnly(['fid', 'name', 'by', 'exp', 'used'])
+        && request.resource.data.by == request.auth.uid && request.resource.data.used == false
+        && request.resource.data.exp is timestamp && request.resource.data.exp > request.time
+        && request.resource.data.exp < request.time + duration.value(24, 'h');
+      allow update: if signed() && resource.data.used == false && request.time < resource.data.exp
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
+        && request.resource.data.used == true && request.resource.data.usedBy == request.auth.uid;
+      allow delete: if member(resource.data.fid);
+      allow list: if false;
+    }
+  }
+}
