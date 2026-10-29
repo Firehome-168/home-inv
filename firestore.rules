@@ -36,7 +36,8 @@ service cloud.firestore {
     match /catalogs/{cid} {
       allow get: if true;
       allow create: if cid.matches('^[A-Z0-9]{12}$') && member(request.resource.data.fid);
-      allow update: if member(resource.data.fid) && request.resource.data.fid == resource.data.fid;
+      allow update: if (member(resource.data.fid) && request.resource.data.fid == resource.data.fid)
+        || (!exists(/databases/$(database)/documents/families/$(resource.data.fid)) && member(request.resource.data.fid));   // 原家庭已刪除 (重建家庭) : 新家庭接手
       allow delete: if member(resource.data.fid);
       allow list: if false;
       match /p/{pid} {
