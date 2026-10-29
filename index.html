@@ -45,6 +45,7 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);
 header h1{font-size:20px;margin:0;flex:1}
 .cdot{font-size:20px;color:var(--muted);padding:0 4px;cursor:pointer}
 .cdot.on{color:#2f9c8f}
+.cpend{font-size:12px;font-weight:700;background:var(--warn);color:#fff;border-radius:10px;padding:2px 7px;margin-right:2px;cursor:pointer;white-space:nowrap}
 .iconbtn{border:0;background:transparent;color:var(--ink);font-size:22px;width:40px;height:40px;border-radius:20px}
 .iconbtn:active{background:var(--line)}
 main{padding:0 16px 16px;max-width:720px;margin:0 auto}
@@ -163,6 +164,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
 <body>
 <header>
   <h1 id="title">家用進銷存</h1>
+  <span id="cloudPend" class="cpend" hidden title="還沒傳到雲端的筆數，連上網路後自動上傳"></span>
   <span id="cloudDot" class="cdot" hidden title="雲端同步">☁</span>
   <button class="iconbtn" id="btnSet" aria-label="設定">⚙</button>
 </header>
@@ -360,7 +362,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.7</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.8</p>
   </section>
 </main>
 
@@ -842,17 +844,25 @@ const Cloud = {
   },
   fail(e) { this.err = (e && (e.code === 'permission-denied' ? '雲端拒絕存取 (請確認 firestore.rules 已發布)' : e.message)) || '同步錯誤'; updDot(); if (S.view === 'set') renderCloud(); },
   // 本機寫入後上傳 (雲端還沒準備好就先記在待傳清單)
+  // 待上傳清單 (cloud_outbox_家庭) : 寫入前先記 , 雲端伺服器確認收到才移除 ; 關掉 APP 還沒確認的 , 下次開啟重傳
+  gen: {},
   push(store, o, del) {
     if (!this.on || (store === 'meta' && LOCAL_META.includes(o.k))) return;
-    const key = this.docKey(store, o);
-    if (!this.fb) { this.outbox(key); return; }
+    const key = this.docKey(store, o), g = this.gen[key] = (this.gen[key] || 0) + 1;
+    this.outbox(key);
+    if (!this.fb) return;
     const F = this.F;
     F.setDoc(this.recRef(key), { s: store, j: del ? '' : JSON.stringify(o), del: !!del, t: F.serverTimestamp(), by: this.uid, ss: this.ss })
-      .catch(e => { this.outbox(key); this.fail(e); });
+      .then(() => { if (this.gen[key] === g) this.outbox(key, true); })
+      .catch(e => this.fail(e));
   },
-  outbox(key) {
-    const k = 'cloud_outbox_' + this.fid, a = new Set(JSON.parse(lsG(k) || '[]')); a.add(key); lsS(k, JSON.stringify([...a]));
+  outbox(key, done) {
+    const k = 'cloud_outbox_' + this.fid, a = new Set(JSON.parse(lsG(k) || '[]'));
+    if (done) a.delete(key); else a.add(key);
+    lsS(k, a.size ? JSON.stringify([...a]) : '');
+    updDot();
   },
+  pendN() { return this.on ? JSON.parse(lsG('cloud_outbox_' + this.fid) || '[]').length : 0; },
   flush() {
     const k = 'cloud_outbox_' + this.fid, a = JSON.parse(lsG(k) || '[]'); if (!a.length) return;
     lsS(k, '');
@@ -934,12 +944,16 @@ async function localWipe() {
   });
   await loadAll(); render();
 }
+const pendHtml = () => { const n = Cloud.pendN(); return n ? `<b style="color:var(--warn)">待上傳 ${n} 筆</b> (連上網路後自動上傳)` : '這台資料都已上傳'; };
 function updDot() {
   const d = $('#cloudDot'); if (!d) return;
   d.hidden = !Cloud.cfg || !Cloud.on;
   const ok = Cloud.on && Cloud.fb && !Cloud.err && navigator.onLine;
   d.className = 'cdot' + (ok ? ' on' : '');
   d.title = ok ? '雲端同步中' : (Cloud.err || '離線，連線後自動同步');
+  const p = $('#cloudPend'), n = Cloud.cfg ? Cloud.pendN() : 0;
+  if (p) { p.hidden = !n; p.textContent = '待傳 ' + n; }
+  const e = $('#cl-pend'); if (e) e.innerHTML = pendHtml();
 }
 window.addEventListener('online', () => { updDot(); if (Cloud.on && !Cloud.fb) Cloud.boot(); });
 window.addEventListener('offline', updDot);
@@ -2254,7 +2268,7 @@ function renderCloud() {
   const stat = Cloud.err ? Cloud.err : !navigator.onLine ? '離線中，資料先存在這台，連線後自動同步' :
     Cloud.synced ? '已同步 ' + new Date(Cloud.synced).toLocaleTimeString('zh-TW', { hour12: false }) : '連線中…';
   b.innerHTML = `<p><b>${esc(f ? f.name : '')}</b></p>
-    <p class="small muted">${esc(stat)}</p>
+    <p class="small muted">${esc(stat)}　<span id="cl-pend">${pendHtml()}</span></p>
     <h3 style="margin:14px 0 4px">新增協作者</h3>
     <div class="row"><input id="cl-iname" class="grow" maxlength="20" placeholder="家人裝置名稱，例如 媽媽手機"><button class="btn" id="cl-inv">產生協作者 ID</button></div>
     <p class="small muted">協作者 ID 只限今天、只能用一次。傳給家人後，對方輸入「ID + 今天月日」就加入。</p>
@@ -2302,7 +2316,7 @@ $('#cloudBox').onclick = async e => {
     }
   } catch (err) { toast('雲端操作失敗：' + (err.message || err)); t.disabled = false; }
 };
-$('#cloudDot').onclick = () => show('set');
+$('#cloudDot').onclick = $('#cloudPend').onclick = () => show('set');
 $('#btnShareApp').onclick = () => siteBase() ? shareText(appShareText()) : toast('請從網站開啟 APP 才能分享網址');
 $('#btnAppName').onclick = async () => {
   await setMeta('appName', $('#appNameIn').value.trim()); applyAppName(); toast('已儲存 APP 名稱');
