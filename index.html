@@ -228,7 +228,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
     </div>
     <div class="chips" id="itemChips"></div>
     <div class="card"><ul class="list" id="itemList"></ul></div>
-    <button class="btn" style="width:100%" data-act="newItem">＋ 新增物品</button>
+    <div class="btnrow"><button class="btn" data-act="newItem">＋ 新增物品</button><button class="btn ghost" data-act="snaps">彙整庫存</button></div>
   </section>
 
   <!-- 購入 / 使用 -->
@@ -617,10 +617,10 @@ const DB = {
   open() {
     // 所有存取都先等資料庫開好 (第一次開啟可能較慢 , 避免太快點擊時資料沒存到)
     return this.ready = this.ready || new Promise((ok, bad) => {
-      const r = indexedDB.open('homeinv', 4);
-      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders (舊資料保留)
+      const r = indexedDB.open('homeinv', 5);
+      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders ; v5 : 庫存彙整 snaps (舊資料保留)
         const d = r.result;
-        for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'])
+        for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps'])
           if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true });
         if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
       };
@@ -679,10 +679,10 @@ const DB = {
 const newId = (() => { let last = 0; return () => (last = Math.max(last + 1, (Date.now() - 1.6e12) * 10000 + Math.floor(Math.random() * 10000))); })();
 
 /* ========== 狀態 ========== */
-const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], orders: [], ordFilter: '處理中', meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
+const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], orders: [], snaps: [], ordFilter: '處理中', meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
 
 async function loadAll() {
-  [S.items, S.shops, S.txns, S.custs, S.accts, S.moves, S.orders] = await Promise.all(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'].map(x => DB.all(x)));
+  [S.items, S.shops, S.txns, S.custs, S.accts, S.moves, S.orders, S.snaps] = await Promise.all(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps'].map(x => DB.all(x)));
   const m = await DB.all('meta');
   S.meta = Object.fromEntries(m.map(x => [x.k, x.v]));
 }
@@ -707,7 +707,7 @@ function applyAppName() {
              invites/{ID}                 協作者 ID { fid , name , by , exp , used , usedBy }
    增量同步 : 只讀 t 大於上次同步時間的資料 (刪除用 del 標記 , 不真的刪文件) */
 const LOCAL_META = ['theme', 'lastBackup', 'lastAcct', 'lastCarrier'];   // 每台裝置自己的設定 , 不同步
-const STORES = ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'];
+const STORES = ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps'];
 const FB_VER = '10.12.2';
 const lsG = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 const lsS = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { } };
@@ -816,7 +816,7 @@ const Cloud = {
         const d = ch.doc.data();
         if (d.t && d.t.toMillis) maxT = Math.max(maxT, d.t.toMillis());
         if (ch.doc.metadata.hasPendingWrites || d.ss === this.ss) continue;   // 自己這次開啟寫的
-        applyRemote(ch.doc.id, d); n++;
+        syncTally(applyRemote(ch.doc.id, d)); n++;
       }
       if (!snap.metadata.fromCache) {   // 伺服器確認 : 記下同步到哪個時間 , 下次只讀之後的變動
         for (const d of snap.docs) { const t = d.get('t'); if (t && t.toMillis) maxT = Math.max(maxT, t.toMillis()); }
@@ -824,6 +824,7 @@ const Cloud = {
       }
       this.err = '';
       if (n) scheduleRender();
+      if (!snap.metadata.fromCache) syncToast();
       updDot(); if (S.view === 'set') renderCloud();
     }, e => this.fail(e)));
     this.unsub.push(F.onSnapshot(this.famRef(), snap => {
@@ -881,21 +882,44 @@ const Cloud = {
     return a;
   }
 };
-// 套用雲端傳來的一筆資料 (只寫本機 , 不再上傳)
+// 同步完成提示 : 家人那邊傳來的變動先累計 , 伺服器確認後跳一次 (自己這台寫的不算)
+const SYNC = { t: {}, h: null };
+function syncTally(r) { if (!r) return; const k = r.del ? 'del' : r.s === 'items' ? (r.nu ? 'newItem' : 'updItem') : r.s; SYNC.t[k] = (SYNC.t[k] || 0) + 1; }
+function syncMsg(t) {
+  const a = [];
+  if (t.newItem) a.push(`新品 ${t.newItem} 項`);
+  if (t.updItem) a.push(`物品修改 ${t.updItem} 項`);
+  if (t.txns || t.moves) a.push(`紀錄 ${(t.txns || 0) + (t.moves || 0)} 筆`);
+  if (t.orders) a.push(`訂單 ${t.orders} 筆`);
+  if (t.custs) a.push(`客戶 ${t.custs} 筆`);
+  if (t.snaps) a.push(`庫存彙整 ${t.snaps} 份`);
+  if (t.del) a.push(`刪除 ${t.del} 筆`);
+  const o = (t.shops || 0) + (t.accts || 0) + (t.meta || 0); if (o) a.push(`設定 ${o} 項`);
+  return a.length ? '已從雲端更新：' + a.join('、') : '';
+}
+function syncToast() {
+  if (!Object.keys(SYNC.t).length) return;
+  clearTimeout(SYNC.h);
+  SYNC.h = setTimeout(() => { const m = syncMsg(SYNC.t); SYNC.t = {}; if (m) toast(m, 4000); }, 600);
+}
+// 套用雲端傳來的一筆資料 (只寫本機 , 不再上傳) ; 回傳 { s, nu 新增, del 刪除 } 給同步提示
 function applyRemote(key, d) {
   const s = d.s, id = key.slice(s.length + 1);
   if (s === 'meta') {
     if (LOCAL_META.includes(id)) return;
-    if (d.del) { delete S.meta[id]; DB._del('meta', id); }
-    else { const o = JSON.parse(d.j); S.meta[o.k] = o.v; DB._put('meta', o); if (o.k === 'appName') applyAppName(); }
-    return;
+    if (d.del) { if (!(id in S.meta)) return; delete S.meta[id]; DB._del('meta', id); return { s, del: true }; }
+    const o = JSON.parse(d.j); if (JSON.stringify(S.meta[o.k]) === JSON.stringify(o.v)) return;
+    S.meta[o.k] = o.v; DB._put('meta', o); if (o.k === 'appName') applyAppName();
+    return { s };
   }
   if (!STORES.includes(s)) return;
   const nid = Number(id);
-  if (d.del) { S[s] = S[s].filter(x => x.id !== nid); DB._del(s, nid); return; }
+  if (d.del) { if (!S[s].some(x => x.id === nid)) return; S[s] = S[s].filter(x => x.id !== nid); DB._del(s, nid); return { s, del: true }; }
   const o = JSON.parse(d.j), i = S[s].findIndex(x => x.id === o.id);
+  if (i >= 0 && d.j === JSON.stringify(S[s][i])) return;   // 本機已經一樣 (例如重新開機重收) , 不算更新
   if (i >= 0) S[s][i] = o; else S[s].push(o);
   DB._put(s, o);
+  return { s, nu: i < 0 };
 }
 function scheduleRender() { clearTimeout(Cloud.rTimer); Cloud.rTimer = setTimeout(() => { render(); }, 200); }
 // 清空本機資料 (不動雲端) ; 保留本機設定
@@ -970,7 +994,7 @@ function nearestExpiry(id) {
 function daysTo(iso) { return Math.round((new Date(iso) - new Date(today())) / 86400000); }
 
 /* ========== 共用 UI ========== */
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2200); }
+function toast(msg, ms = 2200) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), ms); }
 function openSheet(html) { $('#sheet').innerHTML = html; $('#sheet').classList.add('on'); $('#sheetBg').classList.add('on'); $('#sheet').scrollTop = 0; }
 function closeSheet() { $('#sheet').classList.remove('on'); $('#sheetBg').classList.remove('on'); stopScan(); }
 $('#sheetBg').onclick = closeSheet;
@@ -1005,6 +1029,8 @@ document.body.addEventListener('click', e => {
   else if (act === 'cust') custDetail(id);
   else if (act === 'newItem') itemForm();
   else if (act === 'item') itemDetail(id);
+  else if (act === 'snaps') snapList();
+  else if (act === 'snap') snapDetail(id);
   else if (act === 'txn') txnForm(null, id);
 });
 
@@ -1757,6 +1783,72 @@ async function orderPaid(orderId, fee, tot, acctId, date) {
   await orderSave(o);
 }
 
+/* ========== 彙整庫存 : 目前每項物品的庫存整理成一份 (時間、裝置) , 存本機並上傳家庭雲端 , 家人都看得到 ========== */
+const hhmm = ms => { const d = new Date(ms), p2 = n => String(n).padStart(2, '0'); return p2(d.getHours()) + ':' + p2(d.getMinutes()); };
+const snapWhen = s => roc(s.date) + ' ' + hhmm(s.at);
+function snapList() {
+  const arr = [...S.snaps].sort((a, b) => b.at - a.at);
+  const cnt = S.items.filter(it => !it.noStock).length;
+  openSheet(`<h3>彙整庫存</h3>
+    <p class="small muted">把目前 ${cnt} 項物品的庫存數量、平均單價、庫存金額、售價、安全存量整理成一份清單，${Cloud.on ? '上傳到家庭雲端，家人每台都看得到' : '存在這台 (加入家庭雲端後會一起上傳給家人)'}。之後可和現在的庫存對照增減。</p>
+    <button class="btn" style="width:100%;margin-bottom:12px" id="sn-make">${Cloud.on ? '彙整並上傳' : '彙整'}</button>
+    <div class="card"><h2>彙整紀錄 (${arr.length})</h2><ul class="list">${arr.map(s => `<li class="tap" data-act="snap" data-id="${s.id}">
+      <div class="grow"><div class="ttl">${snapWhen(s)}</div><div class="small muted">${esc(s.by || '')}${s.note ? ' · ' + esc(s.note) : ''}</div></div>
+      <div class="num small">${s.rows.length} 項<br>$${fmt(s.val)}</div></li>`).join('') || '<li class="empty">還沒有彙整過</li>'}</ul></div>`);
+  $('#sn-make').onclick = snapMake;
+}
+async function snapMake() {
+  const rows = [];
+  for (const it of [...S.items].sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept) || a.name.localeCompare(b.name, 'zh-Hant'))) {
+    if (it.noStock) continue;
+    const st = stockOf(it.id), avg = Math.round(st.avg * 100) / 100;
+    rows.push({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', q: st.qty, a: avg, v: Math.round(st.qty * avg), sp: it.sp || 0, sf: it.safe || 0 });
+  }
+  if (!rows.length) { toast('沒有要計庫存的物品'); return; }
+  const note = prompt('備註 (可空白，例如 月底盤點)', '');
+  if (note === null) return;
+  const s = { date: today(), at: Date.now(), by: lsG('cloud_name') || '這台', note: note.trim(), rows,
+    qty: Math.round(rows.reduce((t, r) => t + r.q, 0) * 100) / 100, val: rows.reduce((t, r) => t + r.v, 0) };
+  await DB.put('snaps', s); S.snaps.push(s);
+  toast(Cloud.on ? '已彙整並上傳家庭雲端' : '已彙整 (存在這台)');
+  snapDetail(s.id);
+}
+function snapText(s) {
+  let t = `${appName()} 庫存彙整 ${snapWhen(s)} (${s.by || ''})${s.note ? '\n' + s.note : ''}\n`, d = '';
+  for (const r of s.rows) { if (r.d !== d) { d = r.d; t += `\n【${d}】\n`; } t += `${r.n} ${fmtQ(r.q)}${r.u}${r.sf > 0 && r.q <= r.sf ? ' (不足)' : ''}\n`; }
+  return t + `\n共 ${s.rows.length} 項，庫存金額 $${fmt(s.val)}`;
+}
+function snapDetail(id) {
+  const s = S.snaps.find(x => x.id === id); if (!s) return;
+  let d = '', curVal = 0;
+  const rows = s.rows.map(r => {
+    const it = itemById(r.i), st = it ? stockOf(r.i) : null, now = st ? st.qty : null, df = st ? Math.round((now - r.q) * 100) / 100 : null;
+    if (st) curVal += Math.round(now * st.avg);
+    const hd = r.d !== d ? (d = r.d, `<li style="padding-top:12px">${deptTag(r.d)}</li>`) : '';
+    return hd + `<li><div class="grow"><div class="ttl">${esc(r.n)}</div><div class="small muted">均價 $${fmtQ(r.a)} · 金額 $${fmt(r.v)}${r.sp ? ' · 售價 $' + fmt(r.sp) : ''}</div></div>
+      <div class="num" style="min-width:64px;${r.sf > 0 && r.q <= r.sf ? 'color:var(--warn);font-weight:700' : ''}">${fmtQ(r.q)}<span class="small muted">${esc(r.u)}</span>
+      <div class="small ${df ? '' : 'muted'}" style="font-weight:400;${df ? 'color:' + (df > 0 ? 'var(--sale)' : 'var(--danger)') : ''}">${now === null ? '已刪除' : df ? '現在 ' + fmtQ(now) + ' (' + (df > 0 ? '+' : '') + fmtQ(df) + ')' : '現在相同'}</div></div></li>`;
+  }).join('');
+  openSheet(`<h3>庫存彙整 ${snapWhen(s)}</h3>
+    <div class="card small"><div>彙整裝置：${esc(s.by || '')}${s.note ? '　備註：' + esc(s.note) : ''}</div>
+      <div>共 ${s.rows.length} 項 · 庫存金額 <b>$${fmt(s.val)}</b> · 現在 $${fmt(curVal)}</div>
+      <div class="muted">${Cloud.on ? '已同步到家庭雲端' : '只存在這台'}</div></div>
+    <div class="btnrow" style="margin-bottom:12px"><button class="btn line" id="sd-share">分享 (LINE)</button><button class="btn ghost" id="sd-csv">下載 CSV</button><button class="btn danger" id="sd-del">刪除</button></div>
+    <div class="card"><ul class="list">${rows}</ul></div>
+    <button class="btn ghost" style="width:100%" id="sd-back">‹ 彙整紀錄</button>`);
+  $('#sd-back').onclick = snapList;
+  $('#sd-share').onclick = () => shareText(snapText(s));
+  $('#sd-csv').onclick = () => {
+    const out = [['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '售價', '安全存量', '現在庫存', '差異']];
+    for (const r of s.rows) { const it = itemById(r.i), now = it ? stockOf(r.i).qty : ''; out.push([r.d, r.c, r.n, r.q, r.u, r.a, r.v, r.sp || '', r.sf || '', now, it ? Math.round((now - r.q) * 100) / 100 : '']); }
+    saveFile(`${appName()}庫存彙整_${s.date.replace(/-/g, '')}_${hhmm(s.at).replace(':', '')}.csv`, csv(out), 'text/csv');
+  };
+  $('#sd-del').onclick = async () => {
+    if (!confirm(`刪除 ${snapWhen(s)} 的庫存彙整？${Cloud.on ? '\n家人那邊也會一起刪除。' : ''}`)) return;
+    await DB.del('snaps', s.id); S.snaps = S.snaps.filter(x => x.id !== s.id); toast('已刪除'); snapList();
+  };
+}
+
 /* ========== 商品型錄 : 產生獨立網頁 (上傳 GitHub Pages 給會員看 , 下單用 LINE 傳回) ========== */
 function catalogData() {
   const items = S.items.filter(it => !it.noStock && it.sp > 0)
@@ -2234,7 +2326,7 @@ async function saveBlobs(list) {   // [{ name, blob }]
 const saveFile = (name, text, mime) => saveBlobs([{ name, blob: new Blob([text], { type: mime }) }]);
 const stamp = () => today().replace(/-/g, '');
 $('#btnBackup').onclick = async () => {
-  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders, appName: S.meta.appName || '' };
+  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders, snaps: S.snaps, appName: S.meta.appName || '' };
   if (await saveFile(`${appName()}備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
     await setMeta('lastBackup', Date.now()); toast('備份完成'); renderSet();
   }
@@ -2247,8 +2339,8 @@ $('#fileRestore').onchange = async e => {
   if (d.app !== 'homeinv' || !Array.isArray(d.items) || !Array.isArray(d.txns)) { toast('這不是家用進銷存的備份檔'); return; }
   if (!confirm(`用備份檔還原？\n物品 ${d.items.length} 筆、紀錄 ${d.txns.length} 筆\n目前${Cloud.on ? '全部家人' : '手機上'}的資料會被取代。`)) return;
   const prevKeys = Cloud.on ? Cloud.allKeys() : [];
-  await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders'], 'readwrite', t => {
-    for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders']) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
+  await DB.tx(STORES, 'readwrite', t => {
+    for (const s of STORES) { const o = t.objectStore(s); o.clear(); for (const r of d[s] || []) o.put(r); }
   });
   await loadAll(); await migrateCusts(); await migrateAccts();
   if (d.appName) await setMeta('appName', d.appName);   // 備份檔帶自訂 APP 名稱
@@ -2296,7 +2388,7 @@ $('#btnWipe').onclick = async () => {
   if (!confirm(Cloud.on ? '清除全部家人的家庭資料？(雲端也會清除)' : '清除這支手機上的全部資料？')) return;
   if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
   const prevKeys = Cloud.on ? Cloud.allKeys() : [];
-  await DB.tx(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta'], 'readwrite', t => { for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'meta']) t.objectStore(s).clear(); });
+  await DB.tx([...STORES, 'meta'], 'readwrite', t => { for (const s of [...STORES, 'meta']) t.objectStore(s).clear(); });
   await loadAll(); await migrateAccts();
   if (Cloud.on) await Cloud.uploadAll(prevKeys);
   applyTheme(); applyAppName(); toast('已清除'); show('home');

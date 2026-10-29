@@ -1,5 +1,5 @@
 // 家用進銷存 service worker : 離線可用 (程式檔快取 , 資料在 IndexedDB 不經過這裡)
-const CACHE = 'homeinv-v15';
+const CACHE = 'homeinv-v17';
 const FILES = ['./', './index.html', './manifest.json', './firebase-config.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
