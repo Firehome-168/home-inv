@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.3</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.4</p>
   </section>
 </main>
 
@@ -1047,7 +1047,7 @@ function openSheet(html) { $('#sheet').innerHTML = html; imeBtns($('#sheet')); $
 function imeSet(el, b, m) {
   if (m === 'en') { el.setAttribute('inputmode', 'email'); el.setAttribute('lang', 'en'); el.setAttribute('autocapitalize', 'off'); el.setAttribute('spellcheck', 'false'); }
   else { if (el.dataset.im0) el.setAttribute('inputmode', el.dataset.im0); else el.removeAttribute('inputmode'); el.setAttribute('lang', 'zh-Hant'); el.removeAttribute('autocapitalize'); el.removeAttribute('spellcheck'); }
-  b.textContent = m === 'en' ? '英' : '中'; b.classList.toggle('en', m === 'en'); b.title = m === 'en' ? '目前英數鍵盤，按一下改中文' : '目前可輸入中文，按一下改英數鍵盤';
+  b.textContent = m === 'en' ? '中' : '英'; b.classList.toggle('en', m === 'en'); b.title = m === 'en' ? '目前英文 (深色)，按一下切回中文' : '目前中文，按一下切成英文';   // 按鈕顯示「按下去切成什麼」
 }
 /* Android 的中文鍵盤 (Gboard 注音等) 不理 inputmode , 只有密碼欄一定換英文 :
    「英」的輸入欄在打字時暫時當密碼欄 , 離開欄位就還原 ; 密碼欄瀏覽器一定顯示黑點 , 所以欄位下面即時顯示打的字
