@@ -166,6 +166,7 @@ video{width:100%;border-radius:10px;background:#000}
 .imew>input,.imew>textarea{flex:1;min-width:0}
 .imeb{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;min-width:40px;min-height:40px;font-size:15px;font-weight:700;padding:0 6px}
 .imeb.en{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.imepv{font-size:14px;color:var(--brand);margin:2px 0 0 4px;word-break:break-all}
 #cal-ym select{margin-bottom:8px}
 @media(max-width:360px){#cal .c-day{font-size:16px}#cal .c-cell{min-height:44px}}
 .in-c{color:var(--in)}.out-c{color:var(--out)}.sale-c{color:var(--sale)}
@@ -367,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.1</p>
   </section>
 </main>
 
@@ -1048,20 +1049,42 @@ function imeSet(el, b, m) {
   else { if (el.dataset.im0) el.setAttribute('inputmode', el.dataset.im0); else el.removeAttribute('inputmode'); el.setAttribute('lang', 'zh-Hant'); el.removeAttribute('autocapitalize'); el.removeAttribute('spellcheck'); }
   b.textContent = m === 'en' ? '英' : '中'; b.classList.toggle('en', m === 'en'); b.title = m === 'en' ? '目前英數鍵盤，按一下改中文' : '目前可輸入中文，按一下改英數鍵盤';
 }
+/* Android 的中文鍵盤 (Gboard 注音等) 不理 inputmode , 只有密碼欄一定換英文 :
+   「英」的輸入欄在打字時暫時當密碼欄 , 離開欄位就還原 ; 密碼欄瀏覽器一定顯示黑點 , 所以欄位下面即時顯示打的字
+   多行的欄位 (textarea) 不能當密碼欄 , Android 不顯示按鈕 */
+const isAndroid = () => /Android/.test(navigator.userAgent);
+function imePw(el, on) {
+  if (el.tagName !== 'INPUT' || !isAndroid()) return;
+  const w = el.parentNode;
+  let pv = w.nextElementSibling && w.nextElementSibling.classList.contains('imepv') ? w.nextElementSibling : null;
+  if (on) {
+    if (el.type !== 'password') { el.dataset.t0 = el.type; el.dataset.ac0 = el.getAttribute('autocomplete') || ''; el.type = 'password'; el.setAttribute('autocomplete', 'off'); }
+    if (!pv) { pv = document.createElement('div'); pv.className = 'imepv'; w.after(pv); }
+    const up = () => { pv.textContent = '輸入中：' + el.value; };
+    el._pv = el._pv || (() => up()); el.addEventListener('input', el._pv); up(); pv.hidden = false;
+  } else {
+    if (el.type === 'password') { el.type = el.dataset.t0 || 'text'; if (el.dataset.ac0) el.setAttribute('autocomplete', el.dataset.ac0); else el.removeAttribute('autocomplete'); }
+    if (el._pv) el.removeEventListener('input', el._pv);
+    if (pv) pv.hidden = true;
+  }
+}
 function imeBtns(root) {
   if (!touchDev()) return;   // 電腦的輸入法由 Windows 切換
   root.querySelectorAll('[data-ime]').forEach(el => {
     if (el._ime) return; el._ime = 1;
+    if (el.tagName === 'TEXTAREA' && isAndroid()) return;
     if (el.getAttribute('inputmode')) el.dataset.im0 = el.getAttribute('inputmode');
     const w = document.createElement('div'); w.className = 'imew' + (el.classList.contains('grow') ? ' grow' : ''); if (el.style.margin) { w.style.margin = el.style.margin; el.style.margin = '0'; }
     el.parentNode.insertBefore(w, el); w.appendChild(el);
     const b = document.createElement('button'); b.type = 'button'; b.className = 'imeb'; w.appendChild(b);
     const k = 'ime_' + (el.id || ''); let m = lsG(k) || el.dataset.ime || 'zh';
     imeSet(el, b, m);
+    el.addEventListener('focus', () => imePw(el, m === 'en'));
+    el.addEventListener('blur', () => imePw(el, false));
     b.addEventListener('pointerdown', e => e.preventDefault());   // 不讓按鈕搶走游標
     b.onclick = () => {
       m = m === 'en' ? 'zh' : 'en'; imeSet(el, b, m); if (el.id) lsS(k, m);
-      if (document.activeElement === el) { el.blur(); el.focus(); }   // 重新叫出鍵盤才會換
+      if (document.activeElement === el) { el.blur(); el.focus(); }   // 重新叫出鍵盤才會換 (Android : 離開還原 , 進入時依中/英設定)
       else el.focus();
     };
   });
