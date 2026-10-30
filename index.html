@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.5</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.7</p>
   </section>
 </main>
 
@@ -484,6 +484,7 @@ const fmt = n => (Math.round((n || 0) * 100) / 100).toLocaleString('zh-TW');
 const roc = iso => (Number(iso.slice(0, 4)) - 1911) + '.' + iso.slice(5, 7) + '.' + iso.slice(8, 10);
 const LS = 'catalog_' + D.title;
 const byId = id => D.items.find(x => x.i === id);
+const vis = () => D.items.filter(x => D.showSold !== false || x.q > 0);   // 已售完商品依型錄設定顯示
 let cart = {}, dept = '', ship = '自取', pay = '現金', ordNo = '';
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2400); }
 function save() { try { localStorage.setItem(LS, JSON.stringify({ cart, nm: $('#nm').value, ph: $('#ph').value, ad: $('#ad').value, ship, pay })); } catch (e) { } }
@@ -498,7 +499,9 @@ async function shareText(text) {
   try { await navigator.clipboard.writeText(text); toast('已複製，可貼到 LINE'); } catch (e) { prompt('複製', text); }
 }
 const catUrl = /^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0] : (D.cat || '');
-if (catUrl) $('#shareCat').onclick = () => shareText(`${D.title} 商品型錄，歡迎選購\n${catUrl}`);
+// 分享文字 : 商品清單 (售價、尚有/已售完) + 下單網址
+const shareMsg = () => D.title + ' 商品型錄，歡迎選購\n' + vis().map(x => '・' + x.n + ' $' + fmt(x.p) + (x.q > 0 ? ' (尚有 ' + fmt(x.q) + (x.u || '') + ')' : ' (已售完)')).join('\n') + '\n看照片、下單請點：\n' + catUrl;
+if (catUrl) $('#shareCat').onclick = () => shareText(shareMsg());
 else $('#shareCat').hidden = true;
 const appUrl = D.app || (/^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') : '');   // 型錄和 APP 放同一個資料夾
 if (appUrl) { $('#appBox').hidden = false; $('#appLink').href = appUrl; }
@@ -507,11 +510,11 @@ let depts = [];
 function head() {
   document.title = D.title + ' 商品型錄';
   $('#ttl').textContent = D.title;
-  $('#sub').textContent = '更新日期 ' + roc(D.date) + (D.tm ? ' ' + D.tm : '') + ' · 共 ' + D.items.length + ' 項商品';
+  $('#sub').textContent = '更新日期 ' + roc(D.date) + (D.tm ? ' ' + D.tm : '') + ' · 共 ' + vis().length + ' 項商品';
   $('#note').textContent = D.note || '';
   $('#how').textContent = D.line && D.line[0] === '@' ? '按「用 LINE 傳送訂單」會開啟 ' + D.line + ' 的聊天室，訂單文字已填好，按送出即可。'
     : '按「用 LINE 傳送訂單」後，選擇' + (D.line ? '店家 (LINE ID：' + D.line + ') ' : '店家') + '的聊天室送出；也可以複製訂單文字自行貼上。';
-  depts = [...new Set(D.items.map(x => x.d))];
+  depts = [...new Set(vis().map(x => x.d))];
   if (dept && !depts.includes(dept)) dept = '';
 }
 head();
@@ -520,7 +523,7 @@ function lines() { return Object.keys(cart).map(k => ({ it: byId(Number(k)), n: 
 function chips() { $('#depts').innerHTML = depts.length > 1 ? ['', ...depts].map(d => '<button class="chip' + (dept === d ? ' on' : '') + '" data-d="' + esc(d) + '">' + esc(d || '全部') + '</button>').join('') : ''; }
 function list() {
   const q = $('#q').value.trim().toLowerCase();
-  const arr = D.items.filter(x => (!dept || x.d === dept) && (!q || (x.n + ' ' + x.c).toLowerCase().includes(q)));
+  const arr = vis().filter(x => (!dept || x.d === dept) && (!q || (x.n + ' ' + x.c).toLowerCase().includes(q)));
   $('#list').innerHTML = arr.map(x => {
     const n = cart[x.i] || 0, out = x.q <= 0;
     return '<div class="it">' + (x.im ? '<img class="ph" src="' + x.im + '" alt="" data-z="' + x.i + '">' : '') + '<div class="grow"><div class="ttl">' + esc(x.n) + '</div><div class="small muted">' +
@@ -1954,7 +1957,7 @@ function catalogData() {
     .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, im: it.img || '', q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).filter(r => !r.to || r.to >= today()).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
   const base = siteBase();
   const c = Cloud.cfg, live = c && Cloud.on && S.meta.catAuto && S.meta.catId ? { p: c.projectId, k: c.apiKey, c: S.meta.catId, emu: c.emulator ? c.emulator.firestore : '' } : null;
-  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(),
+  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, showSold: S.meta.catShowSold !== false, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(),
     tm: hhmm(Date.now()), app: base, cat: base && base + 'catalog.html', live, items };
 }
 /* 自動更新型錄 : 家庭雲端 catalogs/{catId} (任何人可讀) , 這台的物品/紀錄/型錄設定有變動 , 4 秒後發布 (內容沒變不發布)
@@ -1998,6 +2001,8 @@ const CatPub = {
     await b.commit().catch(() => { });
   }
 };
+// 分享型錄給客人 : 商品清單 (售價、尚有/已售完 , 不含成本) + 下單網址
+const catShareText = (d, url) => `${d.title} 商品型錄，歡迎選購\n` + d.items.filter(x => d.showSold !== false || x.q > 0).map(x => `・${x.n} $${fmt(x.p)}${x.q > 0 ? ` (尚有 ${fmtQ(x.q)}${x.u || ''})` : ' (已售完)'}`).join('\n') + `\n看照片、下單請點：\n${url}`;
 const hashStr = t => { let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 const catPubAt = () => { const t = Number(lsG('cat_pub_at_' + S.meta.catId) || 0); return t ? '這台上次更新 ' + roc(new Date(t - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)) + ' ' + hhmm(t) : '這台還沒更新過'; };
 function catAutoHtml() {
@@ -2033,17 +2038,18 @@ function catalogForm() {
       <div><label>滿額免運 (0 = 不免運)</label><input id="g-free" type="number" inputmode="numeric" min="0" value="${freeOver()}"></div></div>
     <label>轉帳帳號 (會員選轉帳時顯示)</label><textarea id="g-bank" data-ime="zh" placeholder="例：台灣銀行 (004) 123-456-789012 戶名 王小明">${esc(S.meta.catBank || '')}</textarea>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="g-qty" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowQty ? 'checked' : ''}> 顯示剩餘數量</label>
+    <label class="row" style="color:var(--ink);margin-top:8px"><input id="g-sold" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowSold !== false ? 'checked' : ''}> 顯示已售完商品 (型錄網頁、分享清單)</label>
     <div id="g-autoBox">${catAutoHtml()}</div>
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
-    <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button><button class="btn line" id="g-share">分享型錄網址</button></div>
+    <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button><button class="btn line" id="g-share">分享型錄 (商品清單)</button></div>
     <p class="small muted">電腦會存到「下載」資料夾 (iPhone 用分享選單存到「檔案」)。把 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
     「型錄圖片」只列有庫存的商品 (每張 8 項)，含照片、價格、優惠及下單網址，可直接貼到 LINE 群組。<br>
     會員選好商品按「用 LINE 傳送訂單」，你收到後在銷售頁按「貼上會員訂單」就會轉進收銀。<br>
-    「分享型錄網址」把 …/catalog.html 的網址用 LINE 傳給會員 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
+    「分享型錄 (商品清單)」把商品、售價、剩餘數量 (含已售完) 和下單網址用 LINE 傳給會員，不含成本 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
     ${S.meta.catAuto && Cloud.on ? '已開啟自動更新：售價、庫存有變動不用再上傳。只有關閉自動更新、或換了 APP 網址時才要重新上傳 catalog.html。' : '售價、庫存有變動時，重新下載上傳一次即可 (或開啟上面的「自動更新網站型錄」)。'}</p>`);
   const keep = async () => {
     await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim());
-    await setMeta('catNote', $('#g-note').value.trim()); await setMeta('catShowQty', $('#g-qty').checked);
+    await setMeta('catNote', $('#g-note').value.trim()); await setMeta('catShowQty', $('#g-qty').checked); await setMeta('catShowSold', $('#g-sold').checked);
     await setMeta('catFee', Number($('#g-fee').value) || 0); await setMeta('catFree', Number($('#g-free').value) || 0); await setMeta('catBank', $('#g-bank').value.trim());
   };
   $('#g-view').onclick = async () => {
@@ -2073,7 +2079,7 @@ function catalogForm() {
   };
   $('#g-share').onclick = async () => {
     const base = siteBase(); if (!base) { toast('請從網站開啟 APP 才能分享網址'); return; }
-    await keep(); await shareText(`${S.meta.catTitle || '家用小舖'} 商品型錄，歡迎選購\n${base}catalog.html`);
+    await keep(); await shareText(catShareText(catalogData(), base + 'catalog.html'));
   };
 }
 
