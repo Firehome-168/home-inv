@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.2</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.3</p>
   </section>
 </main>
 
@@ -1080,7 +1080,8 @@ function imeBtns(root) {
     const k = 'ime_' + (el.id || ''); let m = lsG(k) || el.dataset.ime || 'zh';
     imeSet(el, b, m);
     el.addEventListener('focus', () => imePw(el, m === 'en'));
-    el.addEventListener('blur', () => imePw(el, false));
+    el.addEventListener('blur', () => { if (document.hasFocus()) imePw(el, false); });   // 長按切換鍵跳出系統輸入法選單時整個網頁失焦 , 不要還原 (會把鍵盤收起來)
+    window.addEventListener('focus', () => { if (document.activeElement !== el) imePw(el, false); });   // 選單關掉回來 , 游標已不在這欄才還原
     b.addEventListener('pointerdown', e => e.preventDefault());   // 不讓按鈕搶走游標
     b.onclick = () => {
       m = m === 'en' ? 'zh' : 'en'; imeSet(el, b, m); if (el.id) lsS(k, m);
