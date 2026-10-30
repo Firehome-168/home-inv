@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.1</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.2</p>
   </section>
 </main>
 
@@ -2034,9 +2034,29 @@ async function shareText(text) {
   try { await navigator.clipboard.writeText(text); toast('已複製，可貼到 LINE'); } catch (e) { prompt('複製下面的文字', text); }
 }
 const appShareText = () => `推薦「家用進銷存」APP：購入、使用、庫存、收支都能記，資料只存在自己的手機。\n用手機開啟網址，iPhone 按 Safari 分享鈕「加入主畫面」，Android 按 Chrome 選單「安裝應用程式」(或「加到主畫面」)：\n${siteBase()}`;
-function catalogHtml() {
-  const json = JSON.stringify(catalogData()).replace(/</g, '\\u003c');
-  return $('#catTpl').textContent.trim().replace('__DATA__', () => json).split('<\\/script>').join('</' + 'script>');
+/* 型錄網頁 : 上傳用的 catalog.html 只放資料 , 版面和程式在網站的 catalog.js (跟 APP 一起更新 , catalog.html 不用重傳)
+   full = 完整單一檔 (APP 內「預覽」用 , 不需要網路上的 catalog.js) */
+function catalogHtml(full) {
+  const d = catalogData(), json = JSON.stringify(d).replace(/</g, '\\u003c');
+  if (full) return $('#catTpl').textContent.trim().replace('__DATA__', () => json).split('<\\/script>').join('</' + 'script>');
+  const t = esc(d.title), sc = 'script';
+  return `<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>${t} 商品型錄</title>
+<meta name="description" content="${t} 商品型錄：看商品照片、價格，線上填寫訂單">
+<meta property="og:title" content="${t} 商品型錄">
+<meta property="og:description" content="看商品照片、價格，線上填寫訂單">
+<style>html,body{margin:0;background:#f4f5f2}@media (prefers-color-scheme: dark){html,body{background:#121614}}</style>
+</head>
+<body>
+<${sc}>window.CAT = ${json};</${sc}>
+<${sc} src="catalog.js" onerror="document.body.insertAdjacentHTML('beforeend','<p style=&quot;padding:20px;font-family:sans-serif&quot;>型錄載入失敗，請確認網路後重新整理。</p>')"></${sc}>
+</body>
+</html>
+`;
 }
 function catalogForm() {
   const n = S.items.filter(it => !it.noStock && it.sp > 0).length, sold = S.items.filter(it => !it.noStock && it.sp > 0 && stockOf(it.id).qty <= 0).length;
@@ -2056,6 +2076,7 @@ function catalogForm() {
     <p class="small muted">電腦會存到「下載」資料夾 (iPhone 用分享選單存到「檔案」)。把 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
     「型錄圖片」只列有庫存的商品 (每張 8 項)，含照片、價格、優惠及下單網址，可直接貼到 LINE 群組。<br>
     會員選好商品按「用 LINE 傳送訂單」，你收到後在銷售頁按「貼上會員訂單」就會轉進收銀。<br>
+    catalog.html 只要上傳一次 (v3.2 起)：商品、售價、庫存由「自動更新網站型錄」更新，型錄網頁的版面跟 APP 一起更新。<br>
     「分享型錄訂購單」用 LINE 傳訂購單給會員 (商品、售價、剩餘數量、姓名電話取貨付款欄，不含成本)，會員填好數量傳回，按「貼上會員訂單」就轉成訂單 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
     ${S.meta.catAuto && Cloud.on ? '已開啟自動更新：售價、庫存有變動不用再上傳。只有關閉自動更新、或換了 APP 網址時才要重新上傳 catalog.html。' : '售價、庫存有變動時，重新下載上傳一次即可 (或開啟上面的「自動更新網站型錄」)。'}</p>`);
   const keep = async () => {
@@ -2065,7 +2086,7 @@ function catalogForm() {
   };
   $('#g-view').onclick = async () => {
     await keep();
-    const w = window.open(URL.createObjectURL(new Blob([catalogHtml()], { type: 'text/html' })), '_blank');
+    const w = window.open(URL.createObjectURL(new Blob([catalogHtml(true)], { type: 'text/html' })), '_blank');
     if (!w) toast('瀏覽器擋住了新視窗');
   };
   $('#g-save').onclick = async () => {
