@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.3</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.3.1</p>
   </section>
 </main>
 
@@ -2104,6 +2104,8 @@ function catalogForm() {
     await setMeta('catNote', $('#g-note').value.trim()); await setMeta('catShowQty', $('#g-qty').checked); await setMeta('catShowSold', $('#g-sold').checked);
     await setMeta('catFee', Number($('#g-fee').value) || 0); await setMeta('catFree', Number($('#g-free').value) || 0); await setMeta('catBank', $('#g-bank').value.trim());
   };
+  // 改完欄位就存 (不用按按鈕 ; 直接關掉也會存) , 有開自動更新會跟著發布網站型錄
+  for (const i of ['g-title', 'g-line', 'g-lineurl', 'g-note', 'g-qty', 'g-sold', 'g-fee', 'g-free', 'g-bank']) $('#' + i).addEventListener('change', () => keep().then(() => toast('已儲存型錄設定')));
   $('#g-view').onclick = async () => {
     await keep();
     const w = window.open(URL.createObjectURL(new Blob([catalogHtml(true)], { type: 'text/html' })), '_blank');
