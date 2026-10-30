@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.8</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.1</p>
   </section>
 </main>
 
@@ -499,8 +499,12 @@ async function shareText(text) {
   try { await navigator.clipboard.writeText(text); toast('已複製，可貼到 LINE'); } catch (e) { prompt('複製', text); }
 }
 const catUrl = /^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0] : (D.cat || '');
-// 分享文字 : 商品清單 (售價、尚有/已售完) + 下單網址
-const shareMsg = () => D.title + ' 商品型錄，歡迎選購\n' + vis().map(x => '・' + x.n + ' $' + fmt(x.p) + (x.q > 0 ? ' (尚有 ' + fmt(x.q) + (x.u || '') + ')' : ' (已售完)')).join('\n') + '\n看照片、下單請點：\n' + catUrl;
+// 分享文字 : 訂購單 (客人在 × 後面填數量傳回 , 店家「貼上會員訂單」可直接轉入)
+const shareMsg = () => [D.title + ' 訂購單', '請在「×」後面填數量，取貨、付款留一個，填好整段傳回：',
+  ...vis().map(x => '・' + x.n + ' $' + fmt(x.p) + (x.u ? '/' + x.u : '') + (x.q > 0 ? ' × ___ (尚有 ' + fmt(x.q) + (x.u || '') + ')' : ' (已售完)')),
+  '----', '姓名：', '電話：', '取貨：自取 / 宅配', '地址：', '付款：現金 / 轉帳', '備註：',
+  D.fee ? '宅配運費 $' + fmt(D.fee) + (D.free > 0 ? '，商品滿 $' + fmt(D.free) + ' 免運' : '') + '；宅配需先轉帳' : '',
+  '看照片、線上下單：', catUrl].filter(Boolean).join('\n');
 if (catUrl) $('#shareCat').onclick = () => shareText(shareMsg());
 else $('#shareCat').hidden = true;
 const appUrl = D.app || (/^https?:/.test(location.protocol) ? location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') : '');   // 型錄和 APP 放同一個資料夾
@@ -1745,14 +1749,17 @@ async function posCheckout() {
 const normName = s => (s || '').normalize('NFKC').replace(/\s+/g, '');
 function parseOrder(txt) {
   txt = (txt || '').normalize('NFKC');
-  const get = k => { const m = txt.match(new RegExp(k + '\\s*[:：]\\s*(.*)')); return m ? m[1].trim() : ''; };
+  const get = k => { const m = txt.match(new RegExp(k + '[ \\t]*[:：][ \\t]*(.*)')); return m ? m[1].trim() : ''; };   // 只抓同一行 (訂購單沒填的欄位不能吃到下一行)
   const lines = [], miss = [];
   for (const ln of txt.split(/\r?\n/)) {
     const m = ln.match(/#(\d+)\s+(.*)\s+[x×]\s*([\d.]+)\s*(?:@\s*([\d.]+))?/);
-    if (!m) continue;
-    const name = m[2].trim(), it = S.items.find(x => normName(x.name) === normName(name)) || itemById(Number(m[1]));
+    // 填好的訂購單 : ・品名 $159/包 × 2 (尚有 5包) ; 沒填數量 (× ___) 的略過
+    const f = m ? null : ln.match(/^\s*[・•·]\s*(.+?)\s+\$\s*([\d,.]+)(?:\/\S+)?\s*[x×]\s*([\d.]+)/);
+    if (!m && !f) continue;
+    const name = (m ? m[2] : f[1]).trim(), it = S.items.find(x => normName(x.name) === normName(name)) || (m ? itemById(Number(m[1])) : null);
     if (!it) { miss.push(name); continue; }
-    lines.push({ id: it.id, qty: Number(m[3]) || 1, price: m[4] !== undefined ? Number(m[4]) : 0 });   // 型錄定價 ; 收銀時依會員優惠重算
+    const qty = Number(m ? m[3] : f[3]); if (!(qty > 0)) continue;
+    lines.push({ id: it.id, qty, price: m ? (m[4] !== undefined ? Number(m[4]) : 0) : 0 });   // 型錄定價 ; 收銀時依會員優惠重算
   }
   return { no: get('單號'), name: get('姓名'), phone: get('電話'), ship: get('取貨'), addr: get('地址'), pay: get('付款'), last5: get('末5碼'), note: get('備註'), lines, miss };
 }
@@ -1770,7 +1777,7 @@ function orderPaste() {
     const dup = o.no && S.orders.find(x => x.no === o.no);
     if (dup) { toast('這張訂單已經匯入過'); orderDetail(dup.id); return; }
     const rec = { no: o.no || 'W' + today().replace(/-/g, '').slice(2) + String(Date.now()).slice(-4), date: today(), name: o.name, phone: o.phone,
-      ship: o.ship === '宅配' ? '宅配' : '自取', addr: o.addr, pay: o.pay === '轉帳' ? '轉帳' : '現金', last5: o.last5, note: o.note,
+      ship: /宅配/.test(o.ship) && !/自取/.test(o.ship) ? '宅配' : '自取', addr: o.addr, pay: /轉帳/.test(o.pay) && !/現金/.test(o.pay) || (/宅配/.test(o.ship) && !/自取/.test(o.ship)) ? '轉帳' : '現金', last5: o.last5, note: o.note,
       lines: o.lines, status: '待收款', track: '' };
     rec.fee = orderFee(rec.ship, rec.lines);
     await orderSave(rec);
@@ -2001,8 +2008,12 @@ const CatPub = {
     await b.commit().catch(() => { });
   }
 };
-// 分享型錄給客人 : 商品清單 (售價、尚有/已售完 , 不含成本) + 下單網址
-const catShareText = (d, url) => `${d.title} 商品型錄，歡迎選購\n` + d.items.filter(x => d.showSold !== false || x.q > 0).map(x => `・${x.n} $${fmt(x.p)}${x.q > 0 ? ` (尚有 ${fmtQ(x.q)}${x.u || ''})` : ' (已售完)'}`).join('\n') + `\n看照片、下單請點：\n${url}`;
+// 分享型錄給客人 = 訂購單 : 售價、尚有/已售完 (依設定) , 不含成本 ; 客人在 × 後填數量傳回 , 「貼上會員訂單」可直接轉入
+const catShareText = (d, url) => [`${d.title} 訂購單`, '請在「×」後面填數量，取貨、付款留一個，填好整段傳回：',
+  ...d.items.filter(x => d.showSold !== false || x.q > 0).map(x => `・${x.n} $${fmt(x.p)}${x.u ? '/' + x.u : ''}${x.q > 0 ? ` × ___ (尚有 ${fmtQ(x.q)}${x.u || ''})` : ' (已售完)'}`),
+  '----', '姓名：', '電話：', '取貨：自取 / 宅配', '地址：', '付款：現金 / 轉帳', '備註：',
+  d.fee ? `宅配運費 $${fmt(d.fee)}${d.free > 0 ? `，商品滿 $${fmt(d.free)} 免運` : ''}；宅配需先轉帳` : '',
+  '看照片、線上下單：', url].filter(Boolean).join('\n');
 const hashStr = t => { let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 const catPubAt = () => { const t = Number(lsG('cat_pub_at_' + S.meta.catId) || 0); return t ? '這台上次更新 ' + roc(new Date(t - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)) + ' ' + hhmm(t) : '這台還沒更新過'; };
 function catAutoHtml() {
@@ -2041,11 +2052,11 @@ function catalogForm() {
     <label class="row" style="color:var(--ink);margin-top:8px"><input id="g-sold" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowSold !== false ? 'checked' : ''}> 顯示已售完商品 (型錄網頁、分享清單)</label>
     <div id="g-autoBox">${catAutoHtml()}</div>
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
-    <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button><button class="btn line" id="g-share">分享型錄 (商品清單)</button></div>
+    <div class="btnrow" style="margin-top:8px"><button class="btn" id="g-jpg">產生型錄圖片 (貼 LINE 用)</button><button class="btn line" id="g-share">分享型錄訂購單</button></div>
     <p class="small muted">電腦會存到「下載」資料夾 (iPhone 用分享選單存到「檔案」)。把 catalog.html 上傳到 GitHub Pages (和本 APP 同一個資料夾)，再把網址 …/catalog.html 用 LINE 傳給會員。<br>
     「型錄圖片」只列有庫存的商品 (每張 8 項)，含照片、價格、優惠及下單網址，可直接貼到 LINE 群組。<br>
     會員選好商品按「用 LINE 傳送訂單」，你收到後在銷售頁按「貼上會員訂單」就會轉進收銀。<br>
-    「分享型錄 (商品清單)」把商品、售價、剩餘數量 (含已售完) 和下單網址用 LINE 傳給會員，不含成本 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
+    「分享型錄訂購單」用 LINE 傳訂購單給會員 (商品、售價、剩餘數量、姓名電話取貨付款欄，不含成本)，會員填好數量傳回，按「貼上會員訂單」就轉成訂單 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
     ${S.meta.catAuto && Cloud.on ? '已開啟自動更新：售價、庫存有變動不用再上傳。只有關閉自動更新、或換了 APP 網址時才要重新上傳 catalog.html。' : '售價、庫存有變動時，重新下載上傳一次即可 (或開啟上面的「自動更新網站型錄」)。'}</p>`);
   const keep = async () => {
     await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim());
