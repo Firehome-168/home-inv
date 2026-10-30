@@ -143,7 +143,8 @@ video{width:100%;border-radius:10px;background:#000}
 #cal .c-lunar{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;max-width:100%}
 #cal .c-hol{font-size:9px;color:var(--danger);line-height:1}
 #cal .c-term{width:4px;height:4px;background:var(--in);border-radius:2px;margin-top:1px}
-#cal .c-note{width:6px;height:6px;background:var(--warn);border-radius:3px;position:absolute;top:3px;right:3px}
+#cal .c-note{min-width:7px;height:7px;background:var(--warn);border-radius:4px;position:absolute;top:3px;right:3px}
+#cal .c-nn{position:absolute;top:1px;right:2px;font-size:9px;line-height:11px;min-width:11px;border-radius:6px;color:#fff;text-align:center;font-style:normal;font-weight:700}
 #cal .c-cell.today .c-lunar{color:#66706c}
 #cal-info{padding:10px 12px;background:var(--brand-soft)}
 #cal-info .d{font-size:17px;font-weight:700;margin-bottom:2px}
@@ -152,7 +153,19 @@ video{width:100%;border-radius:10px;background:#000}
 #cal-info .note{background:var(--card);border-left:3px solid var(--warn);padding:4px 8px;border-radius:4px;margin-top:6px;font-size:14px;white-space:pre-wrap;word-break:break-all}
 #cal-info .sbtn{border:0;border-radius:14px;padding:5px 14px;font-size:13px;background:var(--brand);color:var(--brand-ink)}
 #cal-info .sbtn.gray{background:var(--muted);color:var(--card)}
-#cal-ed{display:none;margin-top:6px}
+.nlist{margin-top:6px}
+.nitem{display:flex;align-items:flex-start;gap:6px;background:var(--card);border-left:3px solid var(--line);padding:6px 8px;border-radius:4px;margin-top:4px;font-size:14px;cursor:pointer}
+.nitem input[type=checkbox]{width:20px;min-height:20px;margin:0;flex:none}
+.nitem .ncat{color:#fff;font-size:11px;border-radius:8px;padding:1px 6px;flex:none;margin-top:1px}
+.nitem .ntx{flex:1;white-space:pre-wrap;word-break:break-all}
+.nitem .nd{display:block;font-size:12px;color:var(--muted)}
+.nitem .nrep{font-size:11px;color:var(--muted);flex:none;margin-top:2px}
+.nitem.done .ntx{text-decoration:line-through;color:var(--muted)}
+.nitem.late .nd{color:var(--danger);font-weight:700}
+.imew{display:flex;gap:6px;align-items:flex-start}
+.imew>input,.imew>textarea{flex:1;min-width:0}
+.imeb{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;min-width:40px;min-height:40px;font-size:15px;font-weight:700;padding:0 6px}
+.imeb.en{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 #cal-ym select{margin-bottom:8px}
 @media(max-width:360px){#cal .c-day{font-size:16px}#cal .c-cell{min-height:44px}}
 .in-c{color:var(--in)}.out-c{color:var(--out)}.sale-c{color:var(--sale)}
@@ -187,20 +200,12 @@ th{color:var(--muted);font-weight:600;text-align:left}
         <div class="r" id="cal-term"></div>
         <div class="r" id="cal-yiji"></div>
         <div class="row" style="margin-top:6px">
-          <button class="sbtn" id="cal-btn-note">記事 ✏</button>
+          <button class="sbtn" id="cal-btn-note">＋ 記事</button>
           <span id="cal-hol" class="grow" style="color:var(--danger);font-size:14px;font-weight:700"></span>
-          <button class="sbtn gray" id="cal-exp">匯出記事</button>
-          <button class="sbtn gray" id="cal-imp">匯入記事</button>
+          <button class="sbtn gray" id="cal-list">記事清單</button>
           <input type="file" id="cal-file" accept=".json" hidden>
         </div>
         <div id="cal-note"></div>
-        <div id="cal-ed">
-          <textarea id="cal-ta" placeholder="輸入備忘記事..."></textarea>
-          <div class="row" style="justify-content:flex-end;margin-top:6px">
-            <button class="sbtn gray" id="cal-cancel">取消</button>
-            <button class="sbtn" id="cal-save">儲存</button>
-          </div>
-        </div>
       </div>
     </div>
     <div class="card">
@@ -225,7 +230,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
   <!-- 物品 -->
   <section class="view" id="v-items">
     <div class="row search">
-      <input id="itemQ" type="search" placeholder="搜尋品名、條碼、位置" class="grow">
+      <input id="itemQ" data-ime="zh" type="search" placeholder="搜尋品名、條碼、位置" class="grow">
       <button class="btn ghost" id="btnScanItem" aria-label="掃條碼">▦</button>
     </div>
     <div class="chips" id="itemChips"></div>
@@ -261,7 +266,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <button class="btn ghost" style="width:100%" data-act="order">貼上會員訂單</button>
     </div>
     <div id="saleCust" hidden>
-      <input id="custQ" type="search" placeholder="搜尋代碼、姓名、電話" class="search">
+      <input id="custQ" data-ime="zh" type="search" placeholder="搜尋代碼、姓名、電話" class="search">
       <div class="chips" id="custChips"></div>
       <div class="card"><ul class="list" id="custList"></ul></div>
       <button class="btn sale" style="width:100%" data-act="newCust">＋ 新增客戶</button>
@@ -303,7 +308,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
     <div class="card">
       <h2>APP 名稱</h2>
       <div class="row">
-        <input id="appNameIn" class="grow" maxlength="20" placeholder="家用進銷存">
+        <input id="appNameIn" data-ime="zh" class="grow" maxlength="20" placeholder="家用進銷存">
         <button class="btn" id="btnAppName">儲存</button>
       </div>
       <p class="small muted">顯示在首頁標題，例如「[你會紅]火龍果園」。空白則恢復「家用進銷存」。</p>
@@ -340,7 +345,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>店家</h2>
       <ul class="list" id="shopList"></ul>
       <div class="row" style="margin-top:8px">
-        <input id="shopNew" placeholder="新增店家名稱" class="grow">
+        <input id="shopNew" data-ime="zh" placeholder="新增店家名稱" class="grow">
         <button class="btn" id="btnShopAdd">新增</button>
       </div>
     </div>
@@ -362,7 +367,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v2.9.2</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0</p>
   </section>
 </main>
 
@@ -640,10 +645,10 @@ const DB = {
   open() {
     // 所有存取都先等資料庫開好 (第一次開啟可能較慢 , 避免太快點擊時資料沒存到)
     return this.ready = this.ready || new Promise((ok, bad) => {
-      const r = indexedDB.open('homeinv', 5);
-      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders ; v5 : 庫存彙整 snaps (舊資料保留)
+      const r = indexedDB.open('homeinv', 6);
+      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders ; v5 : 庫存彙整 snaps ; v6 : 記事 notes (舊資料保留)
         const d = r.result;
-        for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps'])
+        for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps', 'notes'])
           if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true });
         if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
       };
@@ -702,10 +707,10 @@ const DB = {
 const newId = (() => { let last = 0; return () => (last = Math.max(last + 1, (Date.now() - 1.6e12) * 10000 + Math.floor(Math.random() * 10000))); })();
 
 /* ========== 狀態 ========== */
-const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], orders: [], snaps: [], ordFilter: '處理中', meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
+const S = { items: [], shops: [], txns: [], custs: [], accts: [], moves: [], orders: [], snaps: [], notes: [], ordFilter: '處理中', meta: {}, saleTab: 'rec', custKind: '', view: 'home', itemDept: '', range: 12, series: ['合計'] };
 
 async function loadAll() {
-  [S.items, S.shops, S.txns, S.custs, S.accts, S.moves, S.orders, S.snaps] = await Promise.all(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps'].map(x => DB.all(x)));
+  [S.items, S.shops, S.txns, S.custs, S.accts, S.moves, S.orders, S.snaps, S.notes] = await Promise.all(['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps', 'notes'].map(x => DB.all(x)));
   const m = await DB.all('meta');
   S.meta = Object.fromEntries(m.map(x => [x.k, x.v]));
 }
@@ -730,7 +735,7 @@ function applyAppName() {
              invites/{ID}                 協作者 ID { fid , name , by , exp , used , usedBy }
    增量同步 : 只讀 t 大於上次同步時間的資料 (刪除用 del 標記 , 不真的刪文件) */
 const LOCAL_META = ['theme', 'lastBackup', 'lastAcct', 'lastCarrier'];   // 每台裝置自己的設定 , 不同步
-const STORES = ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps'];
+const STORES = ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps', 'notes'];
 const FB_VER = '10.12.2';
 const lsG = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
 const lsS = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { } };
@@ -926,6 +931,7 @@ function syncMsg(t) {
   if (t.orders) a.push(`訂單 ${t.orders} 筆`);
   if (t.custs) a.push(`客戶 ${t.custs} 筆`);
   if (t.snaps) a.push(`庫存彙整 ${t.snaps} 份`);
+  if (t.notes) a.push(`記事 ${t.notes} 則`);
   if (t.del) a.push(`刪除 ${t.del} 筆`);
   if (t.accts) a.push(`帳戶 ${t.accts} 個`);
   if (t.shops) a.push(`店家 ${t.shops} 家`);
@@ -1034,7 +1040,32 @@ function daysTo(iso) { return Math.round((new Date(iso) - new Date(today())) / 8
 
 /* ========== 共用 UI ========== */
 function toast(msg, ms = 2200) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), ms); }
-function openSheet(html) { $('#sheet').innerHTML = html; $('#sheet').classList.add('on'); $('#sheetBg').classList.add('on'); $('#sheet').scrollTop = 0; }
+function openSheet(html) { $('#sheet').innerHTML = html; imeBtns($('#sheet')); $('#sheet').classList.add('on'); $('#sheetBg').classList.add('on'); $('#sheet').scrollTop = 0; }
+/* 輸入法 中/英 : 網頁不能直接切換手機輸入法 ; 「英」= 英數鍵盤 (iPhone 一定切成英文 , Android 多數鍵盤會切) , 「中」= 一般鍵盤 , 可用中文
+   欄位加 data-ime="zh|en" (預設) , 每個欄位記住上次的選擇 ; 電腦用 Shift 或 Ctrl+空白鍵 切換 Windows 輸入法 */
+function imeSet(el, b, m) {
+  if (m === 'en') { el.setAttribute('inputmode', 'email'); el.setAttribute('lang', 'en'); el.setAttribute('autocapitalize', 'off'); el.setAttribute('spellcheck', 'false'); }
+  else { if (el.dataset.im0) el.setAttribute('inputmode', el.dataset.im0); else el.removeAttribute('inputmode'); el.setAttribute('lang', 'zh-Hant'); el.removeAttribute('autocapitalize'); el.removeAttribute('spellcheck'); }
+  b.textContent = m === 'en' ? '英' : '中'; b.classList.toggle('en', m === 'en'); b.title = m === 'en' ? '目前英數鍵盤，按一下改中文' : '目前可輸入中文，按一下改英數鍵盤';
+}
+function imeBtns(root) {
+  if (!touchDev()) return;   // 電腦的輸入法由 Windows 切換
+  root.querySelectorAll('[data-ime]').forEach(el => {
+    if (el._ime) return; el._ime = 1;
+    if (el.getAttribute('inputmode')) el.dataset.im0 = el.getAttribute('inputmode');
+    const w = document.createElement('div'); w.className = 'imew' + (el.classList.contains('grow') ? ' grow' : ''); if (el.style.margin) { w.style.margin = el.style.margin; el.style.margin = '0'; }
+    el.parentNode.insertBefore(w, el); w.appendChild(el);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'imeb'; w.appendChild(b);
+    const k = 'ime_' + (el.id || ''); let m = lsG(k) || el.dataset.ime || 'zh';
+    imeSet(el, b, m);
+    b.addEventListener('pointerdown', e => e.preventDefault());   // 不讓按鈕搶走游標
+    b.onclick = () => {
+      m = m === 'en' ? 'zh' : 'en'; imeSet(el, b, m); if (el.id) lsS(k, m);
+      if (document.activeElement === el) { el.blur(); el.focus(); }   // 重新叫出鍵盤才會換
+      else el.focus();
+    };
+  });
+}
 function closeSheet() { $('#sheet').classList.remove('on'); $('#sheetBg').classList.remove('on'); stopScan(); }
 $('#sheetBg').onclick = closeSheet;
 
@@ -1126,6 +1157,7 @@ function renderHome() {
 
   const rec = [...S.txns].sort((a, b) => (b.date + b.id).localeCompare(a.date + a.id) || b.id - a.id).slice(0, 6);
   $('#homeRecent').innerHTML = rec.map(txnRow).join('') || '<li class="empty">還沒有紀錄，先按「＋ 購入」開始</li>';
+  if (window.calRefresh) window.calRefresh();   // 記事 (家人同步) 有變動時行事曆跟著更新
 }
 
 function txnRow(t) {
@@ -1164,24 +1196,24 @@ $('#btnScanItem').onclick = () => scan(code => { $('#itemQ').value = code; rende
 function itemForm(id, preset, done) {
   const it = id ? itemById(id) : Object.assign({ name: '', dept: '其他', cat: '', unit: '個', barcode: '', sp: 0, loc: '', safe: 0, noStock: false, note: '' }, preset || {});
   openSheet(`<h3>${id ? '修改物品' : '新增物品'}</h3>
-    <label>品名 *</label><input id="f-name" value="${esc(it.name)}">
+    <label>品名 *</label><input id="f-name" data-ime="zh" value="${esc(it.name)}">
     <label>照片 (型錄、收銀用)</label>
     <div class="row"><img id="f-img" class="thumb" style="width:72px;height:72px" alt="">
       <div class="btnrow grow"><button class="btn ghost" id="f-photo" type="button">拍照 / 選照片</button><button class="btn ghost" id="f-imgdel" type="button">移除</button></div></div>
     <input type="file" id="f-file" accept="image/*" hidden>
     <label>部門 *</label><div class="chips" id="f-dept" style="flex-wrap:wrap">${DEPTS.map((d, i) => `<button class="chip ${it.dept === d ? 'on' : ''}" data-d="${d}" style="${it.dept === d ? 'background:' + DCOL[i] + ';border-color:' + DCOL[i] : ''}">${d}</button>`).join('')}</div>
-    <div class="two"><div><label>分類</label><input id="f-cat" value="${esc(it.cat)}" placeholder="例：乾貨、清潔"></div>
-      <div><label>單位</label><input id="f-unit" value="${esc(it.unit)}" placeholder="個、包、瓶"></div></div>
+    <div class="two"><div><label>分類</label><input id="f-cat" data-ime="zh" value="${esc(it.cat)}" placeholder="例：乾貨、清潔"></div>
+      <div><label>單位</label><input id="f-unit" data-ime="zh" value="${esc(it.unit)}" placeholder="個、包、瓶"></div></div>
     <label>條碼</label><div class="row"><input id="f-bar" class="grow" value="${esc(it.barcode)}" inputmode="numeric"><button class="btn ghost" id="f-scan" type="button">▦</button></div>
     <label>售價 (收銀、商品型錄用；空白 = 不上架型錄)</label><input id="f-sp" type="number" inputmode="decimal" min="0" step="any" value="${it.sp || ''}">
     <label>優惠價 (依客戶類別、數量自動套用；多個符合取最低價)</label>
     <div id="f-rules"></div>
     <button class="btn ghost" id="f-radd" type="button" style="width:100%">＋ 新增優惠條件</button>
     <div class="small muted" style="margin-top:4px">打折填 9 = 9折、85 = 85折；特價填金額。期間空白 = 不限日期，以銷售日期判斷。例：會員 9折、所有客戶滿 3 件特價 100、11/1~11/30 會員 8折。</div>
-    <div class="two"><div><label>存放位置</label><input id="f-loc" value="${esc(it.loc)}" placeholder="例：廚房上櫃"></div>
+    <div class="two"><div><label>存放位置</label><input id="f-loc" data-ime="zh" value="${esc(it.loc)}" placeholder="例：廚房上櫃"></div>
       <div><label>安全存量</label><input id="f-safe" type="number" inputmode="decimal" min="0" value="${it.safe || ''}" placeholder="少於就提醒"></div></div>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="f-nostock" type="checkbox" style="width:22px;min-height:22px" ${it.noStock ? 'checked' : ''}> 不計庫存 (例：餐費、車資、學費，只記支出)</label>
-    <label>備註</label><input id="f-note" value="${esc(it.note)}">
+    <label>備註</label><input id="f-note" data-ime="zh" value="${esc(it.note)}">
     <div class="btnrow" style="margin-top:14px">
       ${id ? '<button class="btn danger" id="f-del">刪除</button>' : ''}
       <button class="btn ghost" id="f-cancel">取消</button><button class="btn" id="f-ok">儲存</button></div>`);
@@ -1284,19 +1316,19 @@ function txnForm(type, txnId, itemId, toName) {
   const toOpts = S.custs.map(c => `<option value="${esc(c.name)}">${esc(c.code + ' ' + (c.kind || ''))}</option>`).join('');
   openSheet(`<h3>${txnId ? '修改' : '新增'}${tname}</h3>
     <label>物品 *</label>
-    <div class="row"><div class="picker grow"><input id="t-item" autocomplete="off" placeholder="輸入品名或條碼" value="${esc(cur ? cur.name : '')}"><div class="pick-list" id="t-pick"></div></div>
+    <div class="row"><div class="picker grow"><input id="t-item" data-ime="zh" autocomplete="off" placeholder="輸入品名或條碼" value="${esc(cur ? cur.name : '')}"><div class="pick-list" id="t-pick"></div></div>
       <button class="btn ghost" id="t-scan" type="button">▦</button></div>
     <div class="small muted" id="t-info"></div>
     <div class="two"><div><label>日期</label><input id="t-date" type="date" value="${t.date}"></div>
       <div><label>數量</label><input id="t-qty" type="number" inputmode="decimal" min="0" step="any" value="${t.qty}"></div></div>
     ${hasAmt ? `<div class="two"><div><label>單價${isSale ? ' (0 = 分享)' : ''}</label><input id="t-price" type="number" inputmode="decimal" min="0" step="any" value="${t.price || ''}"></div>
       <div><label>金額</label><input id="t-amt" type="number" inputmode="decimal" min="0" step="any" value="${t.amount || ''}"></div></div>` : ''}
-    ${isSale ? `<div class="two"><div><label>客戶 (代碼或姓名)</label><input id="t-to" list="toDL" value="${esc(custName(t))}" placeholder="會員、朋友"><datalist id="toDL">${toOpts}</datalist><div class="small muted" id="t-cinfo"></div></div>
+    ${isSale ? `<div class="two"><div><label>客戶 (代碼或姓名)</label><input id="t-to" data-ime="zh" list="toDL" value="${esc(custName(t))}" placeholder="會員、朋友"><datalist id="toDL">${toOpts}</datalist><div class="small muted" id="t-cinfo"></div></div>
       <div><label>收款帳戶</label><select id="t-acct">${acctOpts(t.acctId)}</select></div></div>` : ''}
-    ${isIn ? `<div class="two"><div><label>店家</label><input id="t-shop" list="shopDL" value="${esc(shopName(t.shopId))}" placeholder="自己種的填「自家」"><datalist id="shopDL">${shopOpts}</datalist></div>
+    ${isIn ? `<div class="two"><div><label>店家</label><input id="t-shop" data-ime="zh" list="shopDL" value="${esc(shopName(t.shopId))}" placeholder="自己種的填「自家」"><datalist id="shopDL">${shopOpts}</datalist></div>
       <div><label>付款帳戶</label><select id="t-acct">${acctOpts(t.acctId)}</select></div></div>
     <label>有效期限 (食品、藥品)</label><input id="t-exp" type="date" value="${t.expiry || ''}">` : ''}
-    <label>備註</label><input id="t-note" value="${esc(t.note)}">
+    <label>備註</label><input id="t-note" data-ime="zh" value="${esc(t.note)}">
     <div class="btnrow" style="margin-top:14px">
       ${txnId ? '<button class="btn danger" id="t-del">刪除</button>' : ''}
       <button class="btn ghost" id="t-cancel">取消</button><button class="btn ${isIn ? '' : isSale ? 'sale' : 'out'}" id="t-ok">儲存</button></div>`);
@@ -1430,11 +1462,11 @@ function custForm(id, done) {
   const c = id ? custById(id) : { code: '', name: '', kind: '朋友', phone: '', addr: '', note: '' };
   openSheet(`<h3>${id ? '修改客戶' : '新增客戶'}</h3>
     <div class="two"><div><label>代碼 (手機號碼)</label><input id="c-code" value="${esc(c.code || '')}" maxlength="10" inputmode="numeric" placeholder="空白=自動編號"></div>
-      <div><label>姓名 *</label><input id="c-name" value="${esc(c.name)}"></div></div>
+      <div><label>姓名 *</label><input id="c-name" data-ime="zh" value="${esc(c.name)}"></div></div>
     <label>類別</label><div class="chips" id="c-kind">${KINDS.map((k, i) => `<button class="chip ${c.kind === k ? 'on' : ''}" data-k="${k}" style="${c.kind === k ? 'background:' + KCOL[i] + ';border-color:' + KCOL[i] : ''}">${k}</button>`).join('')}</div>
     <label>電話 / 手機</label><input id="c-phone" type="tel" value="${esc(c.phone)}">
-    <label>地址</label><input id="c-addr" value="${esc(c.addr)}">
-    <label>備註</label><input id="c-note" value="${esc(c.note)}" placeholder="例：喜歡地瓜、每週六來拿">
+    <label>地址</label><input id="c-addr" data-ime="zh" value="${esc(c.addr)}">
+    <label>備註</label><input id="c-note" data-ime="zh" value="${esc(c.note)}" placeholder="例：喜歡地瓜、每週六來拿">
     <div class="btnrow" style="margin-top:14px">
       ${id ? '<button class="btn danger" id="c-del">刪除</button>' : ''}
       <button class="btn ghost" id="c-cancel">取消</button><button class="btn sale" id="c-ok">儲存</button></div>`);
@@ -1539,16 +1571,16 @@ function posForm(preset) {
   const custOpts = S.custs.map(c => `<option value="${esc(c.name)}">${esc(c.code + ' ' + (c.kind || ''))}</option>`).join('');
   openSheet(`<h3>收銀</h3>
     <label>會員 / 客戶 (代碼、姓名、電話尾碼)</label>
-    <input id="p-cust" list="pDL" autocomplete="off" value="${esc(P.cust)}" placeholder="空白 = 不記會員"><datalist id="pDL">${custOpts}</datalist>
+    <input id="p-cust" data-ime="zh" list="pDL" autocomplete="off" value="${esc(P.cust)}" placeholder="空白 = 不記會員"><datalist id="pDL">${custOpts}</datalist>
     <div class="small muted" id="p-cinfo" style="margin-top:4px"></div>
-    <div class="row" style="margin-top:10px"><input id="p-q" type="search" class="grow" placeholder="搜尋品名或條碼" value="${esc(P.q)}"><button class="btn ghost" id="p-scan" type="button">▦</button></div>
+    <div class="row" style="margin-top:10px"><input id="p-q" data-ime="zh" type="search" class="grow" placeholder="搜尋品名或條碼" value="${esc(P.q)}"><button class="btn ghost" id="p-scan" type="button">▦</button></div>
     <div class="chips" id="p-dept" style="padding-top:8px"></div>
     <div class="pgrid" id="p-grid"></div>
     <div class="card" style="margin-top:10px"><h2>購物車</h2><ul class="list" id="p-cart"></ul></div>
     <div class="two"><div><label>日期</label><input id="p-date" type="date" value="${P.date}"></div>
       <div><label>收款帳戶</label><select id="p-acct">${acctOpts(P.acctId)}</select></div></div>
     ${P.orderId ? `<label>運費 (訂單 ${esc((S.orders.find(o => o.id === P.orderId) || {}).no || '')}，另記一筆運費收入)</label><input id="p-fee" type="number" inputmode="decimal" min="0" value="${P.fee || 0}">` : ''}
-    <label>備註</label><input id="p-note" value="${esc(P.note)}">
+    <label>備註</label><input id="p-note" data-ime="zh" value="${esc(P.note)}">
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="p-cancel">取消</button><button class="btn sale" id="p-ok">結帳</button></div>`);
   $('#p-cust').oninput = () => { P.cust = $('#p-cust').value; posCinfo(); posReprice(); posTotal(); };
   $('#p-date').onchange = () => { P.date = $('#p-date').value || today(); posReprice(); posTotal(); };
@@ -1967,12 +1999,12 @@ function catalogForm() {
   const n = S.items.filter(it => !it.noStock && it.sp > 0).length, sold = S.items.filter(it => !it.noStock && it.sp > 0 && stockOf(it.id).qty <= 0).length;
   openSheet(`<h3>商品型錄網頁</h3>
     <p class="small">上架 ${n} 項${sold ? `，其中 ${sold} 項已售完 (會顯示「已售完」)` : ''}。<span class="muted">在「物品」裡填了售價的才會上架。</span></p>
-    <label>店名 / 型錄標題</label><input id="g-title" value="${esc(S.meta.catTitle || '家用小舖')}">
-    <label>LINE ID (官方帳號用 @ 開頭，可空白)</label><input id="g-line" value="${esc(S.meta.catLine || '')}" placeholder="@abc1234 或 個人 ID" autocapitalize="off">
-    <label>說明 (取貨方式、付款方式)</label><textarea id="g-note">${esc(S.meta.catNote || '')}</textarea>
+    <label>店名 / 型錄標題</label><input id="g-title" data-ime="zh" value="${esc(S.meta.catTitle || '家用小舖')}">
+    <label>LINE ID (官方帳號用 @ 開頭，可空白)</label><input id="g-line" data-ime="en" value="${esc(S.meta.catLine || '')}" placeholder="@abc1234 或 個人 ID" autocapitalize="off">
+    <label>說明 (取貨方式、付款方式)</label><textarea id="g-note" data-ime="zh">${esc(S.meta.catNote || '')}</textarea>
     <div class="two"><div><label>宅配運費</label><input id="g-fee" type="number" inputmode="numeric" min="0" value="${shipFee()}"></div>
       <div><label>滿額免運 (0 = 不免運)</label><input id="g-free" type="number" inputmode="numeric" min="0" value="${freeOver()}"></div></div>
-    <label>轉帳帳號 (會員選轉帳時顯示)</label><textarea id="g-bank" placeholder="例：台灣銀行 (004) 123-456-789012 戶名 王小明">${esc(S.meta.catBank || '')}</textarea>
+    <label>轉帳帳號 (會員選轉帳時顯示)</label><textarea id="g-bank" data-ime="zh" placeholder="例：台灣銀行 (004) 123-456-789012 戶名 王小明">${esc(S.meta.catBank || '')}</textarea>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="g-qty" type="checkbox" style="width:22px;min-height:22px" ${S.meta.catShowQty ? 'checked' : ''}> 顯示剩餘數量</label>
     <div id="g-autoBox">${catAutoHtml()}</div>
     <div class="btnrow" style="margin-top:14px"><button class="btn ghost" id="g-view">預覽</button><button class="btn sale" id="g-save">下載 catalog.html</button></div>
@@ -2137,10 +2169,10 @@ function moveRow(m) {
 function acctForm(id) {
   const a = id ? acctById(id) : { name: '', type: '銀行', open: 0, note: '' };
   openSheet(`<h3>${id ? '修改帳戶' : '新增帳戶'}</h3>
-    <label>名稱 *</label><input id="a-name" value="${esc(a.name)}" placeholder="例：郵局、台銀、悠遊卡">
+    <label>名稱 *</label><input id="a-name" data-ime="zh" value="${esc(a.name)}" placeholder="例：郵局、台銀、悠遊卡">
     <label>類別</label><div class="chips" id="a-type">${ATYPES.map((k, i) => `<button class="chip ${a.type === k ? 'on' : ''}" data-k="${k}" style="${a.type === k ? 'background:' + ACOL[i] + ';border-color:' + ACOL[i] : ''}">${k}</button>`).join('')}</div>
     <label>期初餘額 (信用卡欠款請填負數)</label><input id="a-open" type="number" inputmode="decimal" step="any" value="${a.open || ''}">
-    <label>備註</label><input id="a-note" value="${esc(a.note)}" placeholder="例：帳號末四碼、繳款日">
+    <label>備註</label><input id="a-note" data-ime="zh" value="${esc(a.note)}" placeholder="例：帳號末四碼、繳款日">
     <div class="btnrow" style="margin-top:14px">
       ${id ? '<button class="btn danger" id="a-del">刪除</button>' : ''}
       <button class="btn ghost" id="a-cancel">取消</button><button class="btn" id="a-ok">儲存</button></div>
@@ -2234,9 +2266,9 @@ function moveForm(type, id, preset) {
       <div><label>轉入帳戶</label><select id="m-to">${acctOpts(m.toId)}</select></div></div>
       <div class="small muted">例：提款 (銀行→現金)、存款 (現金→銀行)、繳信用卡 (銀行→信用卡)</div>` :
     `<div class="two"><div><label>${isI ? '收款' : '付款'}帳戶</label><select id="m-acct">${acctOpts(m.acctId)}</select></div>
-      <div><label>項目</label><input id="m-cat" list="catDL" value="${esc(m.cat)}" placeholder="${isI ? '例：薪資' : '例：房租'}"><datalist id="catDL">${cats}</datalist></div></div>`}
+      <div><label>項目</label><input id="m-cat" data-ime="zh" list="catDL" value="${esc(m.cat)}" placeholder="${isI ? '例：薪資' : '例：房租'}"><datalist id="catDL">${cats}</datalist></div></div>`}
     ${type === 'exp' ? `<label>部門</label><div class="chips" id="m-dept" style="flex-wrap:wrap">${DEPTS.map((d, i) => `<button class="chip ${m.dept === d ? 'on' : ''}" data-d="${d}" style="${m.dept === d ? 'background:' + DCOL[i] + ';border-color:' + DCOL[i] : ''}">${d}</button>`).join('')}</div>` : ''}
-    <label>備註</label><input id="m-note" value="${esc(m.note)}">
+    <label>備註</label><input id="m-note" data-ime="zh" value="${esc(m.note)}">
     <div class="btnrow" style="margin-top:14px">
       ${id ? '<button class="btn danger" id="m-del">刪除</button>' : ''}
       <button class="btn ghost" id="m-cancel">取消</button><button class="btn ${isI ? 'sale' : isX ? '' : 'out'}" id="m-ok">儲存</button></div>`);
@@ -2366,14 +2398,15 @@ function inviteText(iid, name) {
   return `邀請「${name}」加入「${Cloud.fam ? Cloud.fam.name : appName()}」家庭帳本\n1. 用手機開啟 ${url}\n2. 到「設定 > 家庭雲端同步」\n3. 通行密碼輸入：${iid} 再接上今天月日 4 碼 (例 10 月 29 日 → ${iid}1029)\n協作者 ID 只限今天、只能用一次。`;
 }
 const shareInvite = (iid, name) => shareText(inviteText(iid, name));
-function renderCloud() {
+function renderCloud() { renderCloud0(); const b0 = $('#cloudBox'); if (b0) imeBtns(b0); }
+function renderCloud0() {
   const b = $('#cloudBox'); if (!b) return;
   if (!Cloud.cfg) { b.innerHTML = '<p class="small muted">尚未設定雲端。需先建立 Firebase 專案並填入 firebase-config.js (見 README 說明)。</p>'; return; }
   if (!Cloud.on) {
-    b.innerHTML = `<label>通行密碼</label><div class="row"><input id="cl-pass" class="grow" maxlength="12" placeholder="協作者 ID 8 碼 + 月月日日" autocapitalize="characters" autocomplete="off"><button class="btn" id="cl-join">加入家庭</button></div>
+    b.innerHTML = `<label>通行密碼</label><div class="row"><input id="cl-pass" data-ime="en" class="grow" maxlength="12" placeholder="協作者 ID 8 碼 + 月月日日" autocapitalize="characters" autocomplete="off"><button class="btn" id="cl-join">加入家庭</button></div>
       <p class="small muted">向家人索取「協作者 ID」(只限今天、只能用一次)，後面接上今天月日 4 碼 (例 10 月 29 日 → 1029)，按「加入家庭」。</p>
       <h3 style="margin:14px 0 4px">第一台：建立家庭帳本</h3>
-      <label>這台裝置名稱</label><input id="cl-name" value="${esc(lsG('cloud_name'))}" maxlength="20" placeholder="例如 爸爸手機">
+      <label>這台裝置名稱</label><input id="cl-name" data-ime="zh" value="${esc(lsG('cloud_name'))}" maxlength="20" placeholder="例如 爸爸手機">
       <div class="btnrow" style="margin-top:10px"><button class="btn ghost" id="cl-create">建立家庭帳本</button></div>
       <p class="small muted">這台的資料上傳成為家庭資料，再到這裡「新增協作者」給家人。</p>`;
     return;
@@ -2385,7 +2418,7 @@ function renderCloud() {
   b.innerHTML = `<p><b>${esc(f ? f.name : '')}</b></p>
     <p class="small muted">${esc(stat)}　<span id="cl-pend">${pendHtml()}</span></p>
     <h3 style="margin:14px 0 4px">新增協作者</h3>
-    <div class="row"><input id="cl-iname" class="grow" maxlength="20" placeholder="家人裝置名稱，例如 媽媽手機"><button class="btn" id="cl-inv">產生協作者 ID</button></div>
+    <div class="row"><input id="cl-iname" data-ime="zh" class="grow" maxlength="20" placeholder="家人裝置名稱，例如 媽媽手機"><button class="btn" id="cl-inv">產生協作者 ID</button></div>
     <p class="small muted">協作者 ID 只限今天、只能用一次。傳給家人後，對方輸入「ID + 今天月日」就加入。</p>
     ${pend.length ? `<ul class="list">${pend.map(([k, v]) => `<li><div class="grow">${esc(v.name)}<div class="small muted">協作者 ID <b>${esc(k)}</b>　今天有效，尚未使用</div></div>
       <button class="btn ghost" data-share="${esc(k)}">傳送</button><button class="btn ghost" data-cancel="${esc(k)}">取消</button></li>`).join('')}</ul>` : ''}
@@ -2459,7 +2492,7 @@ async function saveBlobs(list) {   // [{ name, blob }]
 const saveFile = (name, text, mime) => saveBlobs([{ name, blob: new Blob([text], { type: mime }) }]);
 const stamp = () => today().replace(/-/g, '');
 $('#btnBackup').onclick = async () => {
-  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders, snaps: S.snaps, appName: S.meta.appName || '' };
+  const data = { app: 'homeinv', version: 3, exported: new Date().toISOString(), items: S.items, shops: S.shops, txns: S.txns, custs: S.custs, accts: S.accts, moves: S.moves, orders: S.orders, snaps: S.snaps, notes: S.notes, appName: S.meta.appName || '' };
   if (await saveFile(`${appName()}備份_${stamp()}.json`, JSON.stringify(data), 'application/json')) {
     await setMeta('lastBackup', Date.now()); toast('備份完成'); renderSet();
   }
@@ -2577,6 +2610,8 @@ async function migrateAccts() {
   applyTheme(); applyAppName();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
+  imeBtns(document);
+  if (window.notesMigrate) await window.notesMigrate();   // 舊版只存在這台的記事 -> 記事 (全家共用)
   if (location.search.includes('family=')) history.replaceState(null, '', location.pathname);   // 舊版邀請連結已停用
   Cloud.boot();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -2819,7 +2854,8 @@ function renderCalendar(){
     const hol=getHoliday(viewMonth,day)||getLunarHoliday(ld.lm,ld.ld,ld.isLeap);
     if(hol)cell.classList.add("hol");
     let h="";
-    if(lsGet(noteKeyOf(viewYear,viewMonth,day)))h+='<i class="c-note"></i>';
+    const nl=notesOn(isoOf(viewYear,viewMonth,day));
+    if(nl.length)h+=nl.length>1?'<i class="c-nn" style="background:'+ncol(nl[0].cat)+'">'+nl.length+'</i>':'<i class="c-note" style="background:'+ncol(nl[0].cat)+'"></i>';
     h+='<span class="c-day">'+day+'</span>';
     if(hol)h+='<span class="c-hol">'+hol+'</span>';
     h+='<span class="c-lunar">'+(ld.ld===1?ld.mn:(termMap[day]||ld.dn))+'</span>';
@@ -2830,7 +2866,7 @@ function renderCalendar(){
   }
 }
 
-function selectDate(y,m,d){selYear=y;selMonth=m;selDay=d;renderCalendar();updateInfo();cancelNote();}
+function selectDate(y,m,d){selYear=y;selMonth=m;selDay=d;renderCalendar();updateInfo();}
 
 function updateInfo(){
   const d=new Date(selYear,selMonth-1,selDay);
@@ -2847,11 +2883,165 @@ function updateInfo(){
   showNote();
 }
 
-function noteKey(){return noteKeyOf(selYear,selMonth,selDay);}
-function showNote(){const t=lsGet(noteKey());g("cal-note").innerHTML=t?'<div class="note">'+escHtml(t)+'</div>':"";}
-function editNote(){g("cal-ed").style.display="block";g("cal-ta").value=lsGet(noteKey());g("cal-ta").focus();}
-function saveNote(){lsSet(noteKey(),g("cal-ta").value.trim());cancelNote();renderCalendar();showNote();}
-function cancelNote(){g("cal-ed").style.display="none";}
+/* ===== 記事 (v3.0) : 存家庭帳本 notes (全家共用、備份含) ; 一天多則 ; 重複 每週/每月/每年/每年農曆 ; 待辦打勾 (重複的每一期各自打勾) ; 分類顏色 ===== */
+const NCATS = ['家事', '繳費', '醫療', '農事', '生日', '其他'], NCOL = ['#3d7ea6', '#b07a12', '#c4517a', '#4f8a3c', '#b4542d', '#7a7f7c'];
+const NREP = { '': '不重複', w: '每週', m: '每月', y: '每年', yl: '每年(農曆)' };
+const isoOf = (y, m, d) => y + '-' + pad2(m) + '-' + pad2(d);
+const isoDate = iso => new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+const ncol = c => NCOL[Math.max(0, NCATS.indexOf(c))];
+function noteOn(n, iso) {
+  if (iso < n.date) return false;
+  if (!n.rep) return iso === n.date;
+  const y = +iso.slice(0, 4), m = +iso.slice(5, 7), d = +iso.slice(8, 10), m0 = +n.date.slice(5, 7), d0 = +n.date.slice(8, 10);
+  if (n.rep === 'w') return isoDate(iso).getDay() === isoDate(n.date).getDay();
+  if (n.rep === 'm') return d === Math.min(d0, daysInMonth(y, m));
+  if (n.rep === 'y') return m === m0 && d === Math.min(d0, daysInMonth(y, m));
+  if (n.rep === 'yl') {
+    const a = lunarDate(isoDate(iso)); if (a.isLeap || a.lm !== n.lm) return false;
+    if (a.ld === n.ld) return true;
+    if (n.ld === 30 && a.ld === 29) { const t = isoDate(iso); t.setDate(t.getDate() + 1); return lunarDate(t).ld === 1; }   // 農曆小月沒有三十 , 改在廿九
+    return false;
+  }
+  return false;
+}
+const notesOn = iso => S.notes.filter(n => noteOn(n, iso)).sort((a, b) => NCATS.indexOf(a.cat) - NCATS.indexOf(b.cat) || a.id - b.id);
+const isDone = (n, iso) => (n.done || []).includes(iso);
+const rocW = iso => roc(iso) + ' (' + DOW_CH[(isoDate(iso).getDay() + 6) % 7] + ')';
+function noteRow(n, iso, showDate) {
+  const dn = n.todo && isDone(n, iso);
+  return `<div class="nitem${dn ? ' done' : ''}" data-nid="${n.id}" data-iso="${iso}">${n.todo ? `<input type="checkbox" data-ck="1" ${dn ? 'checked' : ''}>` : ''}` +
+    `<span class="ncat" style="background:${ncol(n.cat)}">${esc(n.cat)}</span><span class="ntx">${showDate ? '<span class="nd">' + rocW(iso) + '</span>' : ''}${escHtml(n.text)}</span>` +
+    `${n.rep ? '<span class="nrep">↻' + NREP[n.rep] + '</span>' : ''}</div>`;
+}
+function showNote() {
+  const iso = isoOf(selYear, selMonth, selDay), list = notesOn(iso);
+  g("cal-note").innerHTML = list.length ? '<div class="nlist">' + list.map(n => noteRow(n, iso)).join('') + '</div>' : '';
+}
+async function noteToggle(id, iso) {
+  const n = S.notes.find(x => x.id === id); if (!n) return;
+  const d = new Set(n.done || []); if (d.has(iso)) d.delete(iso); else d.add(iso);
+  n.done = [...d].sort(); await DB.put('notes', n);
+}
+// 點記事 : 勾選 = 完成 ; 其他 = 修改
+function noteClick(e, after) {
+  const it = e.target.closest('.nitem'); if (!it) return;
+  const id = Number(it.dataset.nid), iso = it.dataset.iso;
+  if (e.target.dataset.ck) { noteToggle(id, iso).then(() => { renderCalendar(); showNote(); if (after) after(); }); return; }
+  noteForm(id, iso);
+}
+function noteForm(id, iso) {
+  const n = id ? S.notes.find(x => x.id === id) : { date: iso || isoOf(selYear, selMonth, selDay), text: '', cat: '其他', rep: '', todo: false, done: [] };
+  if (!n) return;
+  openSheet(`<h3>${id ? '修改記事' : '新增記事'}</h3>
+    <label>${n.rep ? '開始日期' : '日期'}</label><input id="n-date" type="date" value="${n.date}">
+    <label>內容 *</label><textarea id="n-text" data-ime="zh" placeholder="例：繳電費、阿嬤生日、施肥">${esc(n.text)}</textarea>
+    <label>分類</label><div class="chips" id="n-cat" style="flex-wrap:wrap">${NCATS.map((c, i) => `<button class="chip ${n.cat === c ? 'on' : ''}" data-v="${c}" style="${n.cat === c ? 'background:' + NCOL[i] + ';border-color:' + NCOL[i] : ''}">${c}</button>`).join('')}</div>
+    <label>重複</label><div class="chips" id="n-rep" style="flex-wrap:wrap">${Object.entries(NREP).map(([k, v]) => `<button class="chip ${n.rep === k ? 'on' : ''}" data-v="${k}">${v}</button>`).join('')}</div>
+    <div class="small muted" id="n-rephint"></div>
+    <label class="row" style="color:var(--ink);margin-top:12px"><input id="n-todo" type="checkbox" style="width:22px;min-height:22px" ${n.todo ? 'checked' : ''}> 待辦 (可打勾完成${n.rep ? '，每一期各自打勾' : ''})</label>
+    <div class="btnrow" style="margin-top:14px">${id ? '<button class="btn danger" id="n-del">刪除</button>' : ''}<button class="btn ghost" id="n-x">取消</button><button class="btn" id="n-ok">儲存</button></div>`);
+  let cat = n.cat, rep = n.rep || '';
+  const hint = () => {
+    const dt = $('#n-date').value; if (!dt) { $('#n-rephint').textContent = ''; return; }
+    const d = isoDate(dt), ld = lunarDate(d);
+    $('#n-rephint').textContent = { '': '', w: '每週' + DOW_CH[(d.getDay() + 6) % 7], m: '每月 ' + d.getDate() + ' 日 (沒有這天的月份用月底)', y: '每年 ' + (d.getMonth() + 1) + '/' + d.getDate(),
+      yl: ld.isLeap ? '這天是閏月，請改選非閏月的日期' : '每年農曆 ' + ld.mn + ld.dn }[rep];
+  };
+  hint(); $('#n-date').onchange = hint;
+  $('#n-cat').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; cat = b.dataset.v;
+    $$('#n-cat .chip').forEach((x, i) => { const on = x.dataset.v === cat; x.classList.toggle('on', on); x.style.background = on ? NCOL[i] : ''; x.style.borderColor = on ? NCOL[i] : ''; }); };
+  $('#n-rep').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; rep = b.dataset.v; $$('#n-rep .chip').forEach(x => x.classList.toggle('on', x.dataset.v === rep)); hint(); };
+  $('#n-x').onclick = closeSheet;
+  $('#n-ok').onclick = async () => {
+    const text = $('#n-text').value.trim(), date = $('#n-date').value;
+    if (!text) { toast('請輸入內容'); return; }
+    if (!date) { toast('請選日期'); return; }
+    const rec = Object.assign({}, n, { date, text, cat, rep, todo: $('#n-todo').checked });
+    if (rep === 'yl') { const ld = lunarDate(isoDate(date)); if (ld.isLeap) { toast('閏月不能設每年農曆，請改日期'); return; } rec.lm = ld.lm; rec.ld = ld.ld; } else { delete rec.lm; delete rec.ld; }
+    if (!rec.todo) rec.done = [];
+    await DB.put('notes', rec);
+    const i = S.notes.findIndex(x => x.id === rec.id); if (i >= 0) S.notes[i] = rec; else S.notes.push(rec);
+    closeSheet(); toast('已儲存');
+    if (!rep) { const d = isoDate(date); viewYear = selYear = d.getFullYear(); viewMonth = selMonth = d.getMonth() + 1; selDay = d.getDate(); }
+    renderCalendar(); updateInfo();
+  };
+  if (id) $('#n-del').onclick = async () => {
+    if (!confirm(n.rep ? `刪除這則${NREP[n.rep]}記事？(每一期都會刪除)` : '刪除這則記事？')) return;
+    await DB.del('notes', id); S.notes = S.notes.filter(x => x.id !== id);
+    closeSheet(); toast('已刪除'); renderCalendar(); showNote();
+  };
+}
+// 記事清單 : 近期 (今天起 60 天) / 待辦 (未完成 , 含過期) / 搜尋
+let nTab = 'soon';
+function noteList(tab) {
+  nTab = tab || nTab;
+  const t = today(), rows = [];
+  if (nTab === 'soon') {
+    const d = isoDate(t);
+    for (let i = 0; i < 60; i++) { const iso = isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate()); for (const n of notesOn(iso)) rows.push(noteRow(n, iso, true)); d.setDate(d.getDate() + 1); }
+  } else if (nTab === 'todo') {
+    const from = isoDate(t); from.setDate(from.getDate() - 90);
+    const list = [];
+    for (const n of S.notes) if (n.todo) {
+      if (!n.rep) { if (!isDone(n, n.date)) list.push([n.date, n]); continue; }
+      const d = new Date(Math.max(from, isoDate(n.date))), end = isoDate(t); end.setDate(end.getDate() + 7);
+      for (; d <= end; d.setDate(d.getDate() + 1)) { const iso = isoOf(d.getFullYear(), d.getMonth() + 1, d.getDate()); if (noteOn(n, iso) && !isDone(n, iso)) list.push([iso, n]); }
+    }
+    list.sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [iso, n] of list) rows.push(noteRow(n, iso, true).replace('class="nitem', iso < t ? 'class="nitem late' : 'class="nitem'));
+  }
+  openSheet(`<h3>記事</h3>
+    <div class="chips" id="nl-tab">${[['soon', '近期 60 天'], ['todo', '待辦未完成'], ['find', '搜尋']].map(([k, v]) => `<button class="chip ${nTab === k ? 'on' : ''}" data-v="${k}">${v}</button>`).join('')}</div>
+    ${nTab === 'find' ? `<input id="nl-q" type="search" data-ime="zh" placeholder="輸入關鍵字" style="margin:8px 0">` : ''}
+    <div class="card"><div class="nlist" id="nl-list">${nTab === 'find' ? '' : rows.join('') || '<div class="small muted">沒有記事</div>'}</div></div>
+    <div class="btnrow"><button class="btn" id="nl-add">＋ 新增記事</button><button class="btn ghost" id="nl-imp">匯入舊記事檔</button></div>
+    <div class="small muted" style="margin-top:6px">記事存在家庭帳本，家人都看得到；也包含在「備份匯出」裡。舊版「匯出記事」的檔案可用「匯入舊記事檔」轉進來。</div>`);
+  $('#nl-tab').onclick = e => { const b = e.target.closest('.chip'); if (b) noteList(b.dataset.v); };
+  $('#nl-list').onclick = e => noteClick(e, () => noteList());
+  $('#nl-add').onclick = () => noteForm(null, t);
+  $('#nl-imp').onclick = () => g("cal-file").click();
+  if (nTab === 'find') {
+    const q = $('#nl-q'), run = () => {
+      const v = q.value.trim().toLowerCase();
+      $('#nl-list').innerHTML = !v ? '<div class="small muted">輸入關鍵字搜尋全部記事</div>'
+        : S.notes.filter(n => (n.text + ' ' + n.cat).toLowerCase().includes(v)).sort((a, b) => b.date.localeCompare(a.date)).map(n => noteRow(n, n.date, true)).join('') || '<div class="small muted">找不到</div>';
+    };
+    q.oninput = run; run(); setTimeout(() => q.focus(), 50);
+  }
+}
+// 舊記事 (localStorage cal_note_YYYYMMDD , 只在這台) 轉成記事 ; 每台開啟時轉一次
+async function noteImportObj(data) {
+  let cnt = 0;
+  for (const k in data) {
+    const m = /^cal_note_(\d{4})(\d{2})(\d{2})$/.exec(k); if (!m || typeof data[k] !== 'string' || !data[k].trim()) continue;
+    const date = m[1] + '-' + m[2] + '-' + m[3], text = data[k].trim();
+    if (S.notes.some(n => n.date === date && n.text === text)) continue;
+    const n = { date, text, cat: '其他', rep: '', todo: false, done: [] }; await DB.put('notes', n); S.notes.push(n); cnt++;
+  }
+  return cnt;
+}
+async function notesMigrate() {
+  const data = {}, keys = [];
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith("cal_note_")) { data[k] = localStorage.getItem(k); keys.push(k); } } } catch (e) { return; }
+  if (!keys.length) return;
+  const cnt = await noteImportObj(data);
+  keys.forEach(k => lsSet(k, ''));
+  if (cnt) toast('已把這台的 ' + cnt + ' 則舊記事轉進記事');
+  renderCalendar(); showNote();
+}
+function importNotes(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try { const cnt = await noteImportObj(JSON.parse(ev.target.result)); toast('已匯入 ' + cnt + ' 則記事'); renderCalendar(); showNote(); if ($('#nl-list')) noteList(); }
+    catch (err) { toast('檔案格式錯誤，請選擇舊版匯出的記事 JSON 檔'); }
+  };
+  reader.readAsText(file, "UTF-8");
+  e.target.value = "";
+}
+window.calRefresh = () => { renderCalendar(); updateInfo(); };
+window.calT = { noteOn, isoOf, isoDate, isDone, lunarDate, daysInMonth, selectDate, view: (y, m) => { viewYear = y; viewMonth = m; renderCalendar(); } };   // 測試用
+window.notesMigrate = notesMigrate;
 
 function shiftMonth(n){viewMonth+=n;if(viewMonth<1){viewMonth=12;viewYear--;}if(viewMonth>12){viewMonth=1;viewYear++;}
   if(viewYear<1950){viewYear=1950;viewMonth=1;}if(viewYear>2065){viewYear=2065;viewMonth=12;}renderCalendar();}
@@ -2867,41 +3057,13 @@ function showYMPicker(){
   g("cal-ym-ok").onclick=()=>{viewYear=+g("cal-sy").value;viewMonth=+g("cal-sm").value;closeSheet();renderCalendar();};
 }
 
-function exportNotes(){
-  const data={};
-  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("cal_note_"))data[k]=localStorage.getItem(k);}}catch(e){}
-  const cnt=Object.keys(data).length;
-  if(!cnt){toast("目前沒有任何記事可匯出");return;}
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
-  a.download="cal_notes_"+toDateKey(now.getFullYear(),now.getMonth()+1,now.getDate())+".json";
-  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  toast("已匯出 "+cnt+" 筆記事");
-}
-function importNotes(e){
-  const file=e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const data=JSON.parse(ev.target.result);let cnt=0;
-      for(const k in data)if(k.startsWith("cal_note_")&&typeof data[k]==="string"){lsSet(k,data[k]);cnt++;}
-      toast("已匯入 "+cnt+" 筆記事");renderCalendar();showNote();
-    }catch(err){toast("檔案格式錯誤，請選擇正確的備份 JSON 檔");}
-  };
-  reader.readAsText(file,"UTF-8");
-  e.target.value="";
-}
-
 g("cal-prev").onclick=()=>shiftMonth(-1);
 g("cal-next").onclick=()=>shiftMonth(1);
 g("cal-today").onclick=goToday;
 g("cal-title").onclick=showYMPicker;
-g("cal-btn-note").onclick=editNote;
-g("cal-save").onclick=saveNote;
-g("cal-cancel").onclick=cancelNote;
-g("cal-exp").onclick=exportNotes;
-g("cal-imp").onclick=()=>g("cal-file").click();
+g("cal-btn-note").onclick=()=>noteForm(null,isoOf(selYear,selMonth,selDay));
+g("cal-list").onclick=()=>noteList();
+g("cal-note").onclick=e=>noteClick(e);
 g("cal-file").onchange=importNotes;
 let touchX0=0;
 g("cal-grid").addEventListener("touchstart",e=>{touchX0=e.touches[0].clientX;},{passive:true});
