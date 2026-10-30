@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.1</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.2</p>
   </section>
 </main>
 
@@ -1084,6 +1084,7 @@ function imeBtns(root) {
     b.addEventListener('pointerdown', e => e.preventDefault());   // 不讓按鈕搶走游標
     b.onclick = () => {
       m = m === 'en' ? 'zh' : 'en'; imeSet(el, b, m); if (el.id) lsS(k, m);
+      if (m === 'zh' && isAndroid()) toast('已改回中文欄位：鍵盤若還是英文，請按鍵盤上的「中/英」鍵切回中文', 4500);   // 網頁只能強迫英文 , 不能強迫中文
       if (document.activeElement === el) { el.blur(); el.focus(); }   // 重新叫出鍵盤才會換 (Android : 離開還原 , 進入時依中/英設定)
       else el.focus();
     };
