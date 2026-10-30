@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.4</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.5</p>
   </section>
 </main>
 
@@ -653,7 +653,9 @@ const DB = {
           if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true });
         if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
       };
-      r.onsuccess = () => { this.db = r.result; ok(); };
+      // 資料庫要升級時 , 其他開著舊版的視窗/分頁會卡住升級 (這時存檔完全沒反應) : 提示關掉 ; 舊版那邊收到通知就關閉連線並重新載入
+      r.onblocked = () => alert('家用進銷存有其他視窗或分頁還開著舊版，資料庫無法升級，存檔會沒有反應。\n請把其他家用進銷存的視窗、分頁全部關掉，再重新開啟這個。');
+      r.onsuccess = () => { this.db = r.result; this.db.onversionchange = () => { this.db.close(); location.reload(); }; ok(); };
       r.onerror = () => bad(r.error);
     });
   },
@@ -2984,7 +2986,7 @@ function noteForm(id, iso) {
     const rec = Object.assign({}, n, { date, text, cat, rep, todo: $('#n-todo').checked });
     if (rep === 'yl') { const ld = lunarDate(isoDate(date)); if (ld.isLeap) { toast('閏月不能設每年農曆，請改日期'); return; } rec.lm = ld.lm; rec.ld = ld.ld; } else { delete rec.lm; delete rec.ld; }
     if (!rec.todo) rec.done = [];
-    await DB.put('notes', rec);
+    try { await DB.put('notes', rec); } catch (e) { toast('儲存失敗：' + (e.message || e), 5000); return; }
     const i = S.notes.findIndex(x => x.id === rec.id); if (i >= 0) S.notes[i] = rec; else S.notes.push(rec);
     closeSheet(); toast('已儲存');
     if (!rep) { const d = isoDate(date); viewYear = selYear = d.getFullYear(); viewMonth = selMonth = d.getMonth() + 1; selDay = d.getDate(); }
