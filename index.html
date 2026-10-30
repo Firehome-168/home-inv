@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.2</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.3</p>
   </section>
 </main>
 
@@ -463,6 +463,13 @@ a.btn{display:block;text-align:center;text-decoration:none}
     <div class="btnrow"><button class="btn ghost" id="copy">複製訂單文字</button><button class="btn ghost" id="clr">清空購物車</button></div>
     <p class="small muted" id="how"></p>
   </section>
+  <section class="card" id="lineBox" style="padding:14px;text-align:center" hidden>
+    <h2 style="font-size:18px;margin:0 0 4px">加店家 LINE 好友</h2>
+    <img id="lineQr" alt="店家 LINE QR 碼" style="display:block;width:220px;max-width:75%;margin:8px auto;background:#fff;padding:8px;border-radius:12px">
+    <p class="small muted" style="margin:4px 0 0;text-align:left">用 LINE 掃描 QR 碼 (手機看這頁就按下面「加入店家 LINE 好友」) 加入好友。選好商品、填好姓名電話後，按「複製訂單」，到店家聊天室長按輸入框選「貼上」再送出。</p>
+    <div class="btnrow"><a class="btn line" id="lineAdd" target="_blank" rel="noopener">加入店家 LINE 好友</a></div>
+    <div class="btnrow"><button class="btn ghost" id="lineCopy">複製訂單 (到 LINE 貼上)</button></div>
+  </section>
   <section class="card" style="padding:14px">
     <div class="btnrow" style="margin-top:0"><button class="btn ghost" id="shareCat">分享這個型錄給朋友</button></div>
     <div id="appBox" hidden>
@@ -519,6 +526,11 @@ function head() {
   $('#how').textContent = D.line && D.line[0] === '@' ? '按「用 LINE 傳送訂單」會開啟 ' + D.line + ' 的聊天室，訂單文字已填好，按送出即可。'
     : '按「用 LINE 傳送訂單」後，選擇' + (D.line ? '店家 (LINE ID：' + D.line + ') ' : '店家') + '的聊天室送出；也可以複製訂單文字自行貼上。';
   depts = [...new Set(vis().map(x => x.d))];
+  // 店家 LINE : QR 碼圖片 / 加好友網址 (沒填網址時用 LINE ID 組)
+  const lu = D.lineUrl || (D.line ? (D.line[0] === '@' ? 'https://line.me/R/ti/p/' + encodeURIComponent(D.line) : 'https://line.me/ti/p/~' + encodeURIComponent(D.line)) : '');
+  $('#lineBox').hidden = !(D.lineQr || lu);
+  $('#lineQr').hidden = !D.lineQr; if (D.lineQr) $('#lineQr').src = D.lineQr;
+  $('#lineAdd').hidden = !lu; if (lu) $('#lineAdd').href = lu;
   if (dept && !depts.includes(dept)) dept = '';
 }
 head();
@@ -601,12 +613,14 @@ $('#send').onclick = () => {
   location.href = D.line && D.line[0] === '@' ? 'https://line.me/R/oaMessage/' + encodeURIComponent(D.line) + '/?' + encodeURIComponent(t)
     : 'https://line.me/R/share?text=' + encodeURIComponent(t);
 };
-$('#copy').onclick = () => {
-  const t = orderText(); if (!t) return;
-  const ok = () => toast('已複製，請貼到 LINE 傳給店家');
+function copyOrder() {
+  const t = orderText(); if (!t) { if (!lines().length) toast('請先按 ＋ 選購商品'); else { $('#form').hidden = false; $('#form').scrollIntoView({ behavior: 'smooth' }); } return; }
+  const ok = () => toast('已複製訂單，請到店家 LINE 聊天室貼上傳送');
   const old = () => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); ok(); } catch (e) { toast('無法複製'); } a.remove(); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, old); else old();
-};
+}
+$('#copy').onclick = copyOrder;
+$('#lineCopy').onclick = copyOrder;
 $('#clr').onclick = () => { if (confirm('清空購物車？')) { cart = {}; ordNo = ''; save(); list(); } };
 chips(); list(); segUI();
 // 自動更新 : 店家 APP 有變動就發布到雲端 , 開啟時讀最新的 (讀不到就用網頁內建的資料)
@@ -1964,7 +1978,7 @@ function catalogData() {
     .map(it => ({ i: it.id, n: it.name, d: it.dept, c: it.cat || '', u: it.unit || '', p: it.sp, im: it.img || '', q: Math.max(0, stockOf(it.id).qty), r: (it.rules || []).filter(r => !r.to || r.to >= today()).map(r => ruleLabel(r) + ' $' + fmt(rulePrice(it.sp, r))) }));
   const base = siteBase();
   const c = Cloud.cfg, live = c && Cloud.on && S.meta.catAuto && S.meta.catId ? { p: c.projectId, k: c.apiKey, c: S.meta.catId, emu: c.emulator ? c.emulator.firestore : '' } : null;
-  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, showSold: S.meta.catShowSold !== false, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', date: today(),
+  return { title: S.meta.catTitle || '家用小舖', note: S.meta.catNote || '', line: S.meta.catLine || '', showQty: !!S.meta.catShowQty, showSold: S.meta.catShowSold !== false, fee: shipFee(), free: freeOver(), bank: S.meta.catBank || '', lineQr: S.meta.catLineQr || '', lineUrl: S.meta.catLineUrl || '', date: today(),
     tm: hhmm(Date.now()), app: base, cat: base && base + 'catalog.html', live, items };
 }
 /* 自動更新型錄 : 家庭雲端 catalogs/{catId} (任何人可讀) , 這台的物品/紀錄/型錄設定有變動 , 4 秒後發布 (內容沒變不發布)
@@ -2064,6 +2078,12 @@ function catalogForm() {
     <p class="small">上架 ${n} 項${sold ? `，其中 ${sold} 項已售完 (會顯示「已售完」)` : ''}。<span class="muted">在「物品」裡填了售價的才會上架。</span></p>
     <label>店名 / 型錄標題</label><input id="g-title" data-ime="zh" value="${esc(S.meta.catTitle || '家用小舖')}">
     <label>LINE ID (官方帳號用 @ 開頭，可空白)</label><input id="g-line" data-ime="en" value="${esc(S.meta.catLine || '')}" placeholder="@abc1234 或 個人 ID" autocapitalize="off">
+    <label>店家 LINE 加好友 QR 碼 (顯示在型錄網頁下方，客人掃碼加好友)</label>
+    <div class="row"><img id="g-qr" class="thumb" style="width:72px;height:72px;background:#fff" alt="">
+      <div class="btnrow grow"><button class="btn ghost" id="g-qrpick" type="button">選 QR 碼圖片</button><button class="btn ghost" id="g-qrdel" type="button">移除</button></div></div>
+    <input type="file" id="g-qrfile" accept="image/*" hidden>
+    <label>加好友網址 (可空白)</label><input id="g-lineurl" data-ime="en" value="${esc(S.meta.catLineUrl || '')}" placeholder="https://line.me/ti/p/..." autocapitalize="off">
+    <div class="small muted">LINE 主頁右上角「加入好友」→「行動條碼」→ 我的 QR 碼：按「儲存」存成圖片，按「複製連結」取得網址。網址空白時用上面的 LINE ID。</div>
     <label>說明 (取貨方式、付款方式)</label><textarea id="g-note" data-ime="zh">${esc(S.meta.catNote || '')}</textarea>
     <div class="two"><div><label>宅配運費</label><input id="g-fee" type="number" inputmode="numeric" min="0" value="${shipFee()}"></div>
       <div><label>滿額免運 (0 = 不免運)</label><input id="g-free" type="number" inputmode="numeric" min="0" value="${freeOver()}"></div></div>
@@ -2080,7 +2100,7 @@ function catalogForm() {
     「分享型錄訂購單」用 LINE 傳訂購單給會員 (商品、售價、剩餘數量、姓名電話取貨付款欄，不含成本)，會員填好數量傳回，按「貼上會員訂單」就轉成訂單 (catalog.html 要先上傳)。型錄網頁最下面有「分享這個型錄給朋友」與「安裝家用進銷存 APP」，會員也能裝來記自己的帳 (資料各自獨立)。<br>
     ${S.meta.catAuto && Cloud.on ? '已開啟自動更新：售價、庫存有變動不用再上傳。只有關閉自動更新、或換了 APP 網址時才要重新上傳 catalog.html。' : '售價、庫存有變動時，重新下載上傳一次即可 (或開啟上面的「自動更新網站型錄」)。'}</p>`);
   const keep = async () => {
-    await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim());
+    await setMeta('catTitle', $('#g-title').value.trim() || '家用小舖'); await setMeta('catLine', $('#g-line').value.trim()); await setMeta('catLineUrl', $('#g-lineurl').value.trim());
     await setMeta('catNote', $('#g-note').value.trim()); await setMeta('catShowQty', $('#g-qty').checked); await setMeta('catShowSold', $('#g-sold').checked);
     await setMeta('catFee', Number($('#g-fee').value) || 0); await setMeta('catFree', Number($('#g-free').value) || 0); await setMeta('catBank', $('#g-bank').value.trim());
   };
@@ -2095,6 +2115,14 @@ function catalogForm() {
     if (await saveFile('catalog.html', catalogHtml(), 'text/html')) toast(isIOS ? '型錄已產生' : 'catalog.html 已存到「下載」資料夾');
   };
   $('#g-jpg').onclick = async () => { await keep(); toast('產生中…'); await catalogJpg(); };
+  const qrUI = () => { const q = S.meta.catLineQr || ''; $('#g-qr').src = q; $('#g-qr').style.visibility = q ? 'visible' : 'hidden'; $('#g-qrdel').hidden = !q; };
+  qrUI();
+  $('#g-qrpick').onclick = () => $('#g-qrfile').click();
+  $('#g-qrfile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { await setMeta('catLineQr', await resizeImg(f, 480, 0.92)); qrUI(); toast('已設定 LINE QR 碼'); } catch (err) { toast('圖片讀取失敗'); }
+  };
+  $('#g-qrdel').onclick = async () => { await setMeta('catLineQr', ''); qrUI(); toast('已移除 LINE QR 碼'); };
   $('#g-autoBox').onclick = async e => {
     if (e.target.id === 'g-pub') { e.target.disabled = true; await keep(); toast((await CatPub.run(true)) ? '網站型錄已更新' : '更新中，請稍候'); e.target.disabled = false; return; }
     if (e.target.id !== 'g-auto') return;
