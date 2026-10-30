@@ -368,7 +368,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.7</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.0.8</p>
   </section>
 </main>
 
@@ -1934,7 +1934,7 @@ function snapDetail(id) {
     <div class="card small"><div>彙整裝置：${esc(s.by || '')}${s.note ? '　備註：' + esc(s.note) : ''}</div>
       <div>共 ${s.rows.length} 項 · 庫存金額 <b>$${fmt(s.val)}</b> · 現在 $${fmt(curVal)}</div>
       <div class="muted">${Cloud.on ? '已同步到家庭雲端' : '只存在這台'}</div></div>
-    <div class="btnrow" style="margin-bottom:12px"><button class="btn line" id="sd-share">分享 (LINE)</button><button class="btn ghost" id="sd-csv">下載 CSV</button><button class="btn danger" id="sd-del">刪除</button></div>
+    <div class="btnrow" style="margin-bottom:12px"><button class="btn ghost" id="sd-share">分享盤點明細 (內部用)</button><button class="btn ghost" id="sd-csv">下載 CSV</button><button class="btn danger" id="sd-del">刪除</button></div>
     <div class="card"><ul class="list">${rows}</ul></div>
     <button class="btn ghost" style="width:100%" id="sd-back">‹ 彙整紀錄</button>`);
   $('#sd-back').onclick = snapList;
