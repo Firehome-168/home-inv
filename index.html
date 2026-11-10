@@ -45,6 +45,11 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);
 header h1{font-size:20px;margin:0;flex:1}
 .cdot{font-size:20px;color:var(--muted);padding:0 4px;cursor:pointer}
 .cdot.on{color:#2f9c8f}
+.ftag{font-size:12px;font-weight:600;background:var(--brand-soft);color:var(--brand);border-radius:10px;padding:2px 8px;margin-right:4px;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.ftag small{font-weight:400;opacity:.8;margin-left:4px}
+.famcard{border:2px solid var(--brand);border-radius:12px;padding:10px 12px;margin:4px 0 10px;background:var(--brand-soft)}
+.famcard .fn{font-size:18px;font-weight:700}
+.famcard .fc{font-family:monospace;font-size:18px;letter-spacing:2px;font-weight:700;color:var(--brand)}
 .cpend{font-size:12px;font-weight:700;background:var(--warn);color:#fff;border-radius:10px;padding:2px 7px;margin-right:2px;cursor:pointer;white-space:nowrap}
 .iconbtn{border:0;background:transparent;color:var(--ink);font-size:22px;width:40px;height:40px;border-radius:20px}
 .iconbtn:active{background:var(--line)}
@@ -178,6 +183,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
 <body>
 <header>
   <h1 id="title">家用進銷存</h1>
+  <span id="famTag" class="ftag" hidden title="目前家庭帳本 (點一下看設定)"></span>
   <span id="cloudPend" class="cpend" hidden title="還沒傳到雲端的筆數，連上網路後自動上傳"></span>
   <span id="cloudDot" class="cdot" hidden title="雲端同步">☁</span>
   <button class="iconbtn" id="btnSet" aria-label="設定">⚙</button>
@@ -368,7 +374,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.3.2</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.3.3</p>
   </section>
 </main>
 
@@ -888,7 +894,7 @@ const Cloud = {
       // 清掉已用過或已過期的協作者 ID
       const live = new Set(this.pending().map(p => p[0])), old = Object.keys(this.fam.inv || {}).filter(k => !live.has(k));
       if (old.length) F.updateDoc(this.famRef(), Object.fromEntries(old.map(k => ['inv.' + k, F.deleteField()]))).catch(() => { });
-      if (S.view === 'set') renderCloud();
+      updDot(); if (S.view === 'set') renderCloud();
     }, e => { if (e && e.code === 'permission-denied') this.leave('這台已被家人移出家庭帳本'); else this.fail(e); }));
     this.flush();
     updDot();
@@ -1004,6 +1010,14 @@ function updDot() {
   const ok = Cloud.on && Cloud.fb && !Cloud.err && navigator.onLine;
   d.className = 'cdot' + (ok ? ' on' : '');
   d.title = ok ? '雲端同步中' : (Cloud.err || '離線，連線後自動同步');
+  const ft = $('#famTag');
+  if (ft) {
+    const fon = !!(Cloud.cfg && Cloud.on);
+    if (fon && Cloud.fam && Cloud.fam.name) lsS('cloud_famname', Cloud.fam.name);
+    const fn = fon ? ((Cloud.fam && Cloud.fam.name) || lsG('cloud_famname') || '家庭') : '';
+    ft.hidden = !fon;
+    if (fon) { ft.innerHTML = `${esc(fn)}<small>${esc(Cloud.fid)}</small>`; ft.title = `目前家庭帳本：${fn}　代碼 ${Cloud.fid}`; }
+  }
   const p = $('#cloudPend'), n = Cloud.cfg ? Cloud.pendN() : 0;
   if (p) { p.hidden = !n; p.textContent = '待傳 ' + n; }
   const e = $('#cl-pend'); if (e) e.innerHTML = pendHtml();
@@ -2511,7 +2525,11 @@ function renderCloud0() {
   const pend = Cloud.pending();
   const stat = Cloud.err ? Cloud.err : !navigator.onLine ? '離線中，資料先存在這台，連線後自動同步' :
     Cloud.synced ? '已同步 ' + new Date(Cloud.synced).toLocaleTimeString('zh-TW', { hour12: false }) : '連線中…';
-  b.innerHTML = `<p><b>${esc(f ? f.name : '')}</b></p>
+  const fnm = (f && f.name) || lsG('cloud_famname') || '';
+  b.innerHTML = `<div class="famcard"><div class="small muted">目前家庭帳本</div>
+      <div class="fn" id="cl-famname">${esc(fnm || '(讀取中…)')}</div>
+      <div class="small muted" style="margin-top:4px">家庭代碼</div><div class="fc" id="cl-famcode">${esc(Cloud.fid)}</div>
+      <div class="small muted" style="margin-top:4px">這台裝置：${esc(lsG('cloud_name') || '')}</div></div>
     <p class="small muted">${esc(stat)}　<span id="cl-pend">${pendHtml()}</span></p>
     <h3 style="margin:14px 0 4px">新增協作者</h3>
     <div class="row"><input id="cl-iname" data-ime="zh" class="grow" maxlength="20" placeholder="家人裝置名稱，例如 媽媽手機"><button class="btn" id="cl-inv">產生協作者 ID</button></div>
@@ -2560,7 +2578,7 @@ $('#cloudBox').onclick = async e => {
     }
   } catch (err) { toast('雲端操作失敗：' + (err.message || err)); t.disabled = false; }
 };
-$('#cloudDot').onclick = $('#cloudPend').onclick = () => show('set');
+$('#cloudDot').onclick = $('#cloudPend').onclick = $('#famTag').onclick = () => show('set');
 $('#btnShareApp').onclick = () => siteBase() ? shareText(appShareText()) : toast('請從網站開啟 APP 才能分享網址');
 $('#btnAppName').onclick = async () => {
   await setMeta('appName', $('#appNameIn').value.trim()); applyAppName(); toast('已儲存 APP 名稱');
