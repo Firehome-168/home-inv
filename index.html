@@ -127,6 +127,23 @@ video{width:100%;border-radius:10px;background:#000}
 .rrow input,.rrow select{min-height:38px;padding:5px 6px;font-size:14px}
 .rrow.hd{font-size:12px;color:var(--muted);margin-bottom:2px}
 .cart-in{width:64px;min-height:32px;padding:3px 6px;text-align:right;font-size:14px}
+/* 天氣預報 (首頁) */
+#wx .wx-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#wx .wx-loc{color:var(--brand);font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+#wx .wx-rf{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:16px;width:32px;height:32px;padding:0;font-size:16px;flex:none}
+#wx .wx-now{display:flex;align-items:center;gap:10px}
+#wx .wx-ic{font-size:42px;line-height:1}
+#wx .wx-t{font-size:38px;font-weight:700;line-height:1;white-space:nowrap}
+#wx .wx-t small{font-size:16px;font-weight:600;color:var(--muted)}
+#wx .wx-tx{font-size:17px;font-weight:600}
+#wx .wx-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;margin-top:10px;text-align:center}
+#wx .wx-d{padding:6px 0;border-radius:8px;line-height:1.35}
+#wx .wx-d.on{background:var(--brand-soft)}
+#wx .wx-di{font-size:22px;line-height:1.3}
+#wx .wx-hi{font-weight:700}
+#wx .wx-wet{color:var(--sale);font-weight:700}
+#wx .wx-src{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
+.wx-cities{display:flex;flex-wrap:wrap;gap:6px}
 /* 萬年行事曆 (首頁頂部) */
 #cal{padding:0;overflow:hidden}
 #cal-hdr{background:var(--brand);color:var(--brand-ink);display:flex;align-items:center;gap:6px;padding:8px;user-select:none}
@@ -215,6 +232,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
         <div id="cal-note"></div>
       </div>
     </div>
+    <div class="card" id="wx"></div>
     <div class="card">
       <h2 id="homeMonth">本月支出</h2>
       <div class="big" id="homeTotal">0</div>
@@ -374,7 +392,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.3.3</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.4</p>
   </section>
 </main>
 
@@ -3185,6 +3203,152 @@ g("cal-grid").addEventListener("touchend",e=>{const dx=e.changedTouches[0].clien
 
 renderCalendar();
 updateInfo();
+})();
+</script>
+<script>
+// ===== 天氣預報 (首頁, 行事曆下方) =====
+// 資料: Open-Meteo (免金鑰, CC BY 4.0) ; 目前位置名稱: BigDataCloud 反查
+// 地點與快取只存在這台裝置 (localStorage), 不經家庭雲端同步 (家人可能在不同地方)
+(function () {
+  const LK = 'wx_loc', CK = 'wx_cache', TTL = 30 * 60000;
+  const CITIES = [
+    ['基隆市', 25.128, 121.741], ['臺北市', 25.038, 121.564], ['新北市', 25.012, 121.465], ['桃園市', 24.993, 121.301],
+    ['新竹市', 24.804, 120.971], ['新竹縣', 24.839, 121.004], ['苗栗縣', 24.560, 120.821], ['臺中市', 24.162, 120.647],
+    ['彰化縣', 24.076, 120.542], ['南投縣', 23.909, 120.685], ['雲林縣', 23.709, 120.543], ['嘉義市', 23.480, 120.449],
+    ['嘉義縣', 23.459, 120.333], ['臺南市', 22.999, 120.227], ['高雄市', 22.627, 120.301], ['屏東縣', 22.669, 120.488],
+    ['宜蘭縣', 24.757, 121.753], ['花蓮縣', 23.992, 121.601], ['臺東縣', 22.756, 121.144], ['澎湖縣', 23.566, 119.580],
+    ['金門縣', 24.437, 118.318], ['連江縣', 26.157, 119.951]
+  ];
+  const WMO = {
+    0: ['晴', '☀️'], 1: ['晴時多雲', '🌤️'], 2: ['多雲', '⛅'], 3: ['陰', '☁️'], 45: ['霧', '🌫️'], 48: ['霧', '🌫️'],
+    51: ['毛毛雨', '🌦️'], 53: ['毛毛雨', '🌦️'], 55: ['毛毛雨', '🌦️'], 56: ['凍毛雨', '🌧️'], 57: ['凍毛雨', '🌧️'],
+    61: ['小雨', '🌧️'], 63: ['中雨', '🌧️'], 65: ['大雨', '🌧️'], 66: ['凍雨', '🌧️'], 67: ['凍雨', '🌧️'],
+    71: ['小雪', '🌨️'], 73: ['中雪', '🌨️'], 75: ['大雪', '❄️'], 77: ['霰', '🌨️'],
+    80: ['陣雨', '🌦️'], 81: ['較強陣雨', '🌧️'], 82: ['豪大陣雨', '⛈️'], 85: ['陣雪', '🌨️'], 86: ['陣雪', '🌨️'],
+    95: ['雷陣雨', '⛈️'], 96: ['雷雨伴冰雹', '⛈️'], 99: ['雷雨伴冰雹', '⛈️']
+  };
+  const WK = '日一二三四五六';
+  const el = id => document.getElementById(id);
+  const h = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const get = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+  const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
+  const say = m => { if (typeof toast === 'function') toast(m); };
+  const wmo = (c, day) => { const w = WMO[c] || ['—', '🌡️']; return (day === 0 && (c === 0 || c === 1)) ? [w[0], c === 0 ? '🌙' : '☁️'] : w; };
+  const bft = kmh => { const ms = kmh / 3.6, t = [0.3, 1.6, 3.4, 5.5, 8, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7]; let i = 0; while (i < t.length && ms >= t[i]) i++; return i; };
+  const r0 = v => Math.round(v);
+  const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const keyOf = L => L ? L.lat.toFixed(3) + ',' + L.lon.toFixed(3) : '';
+  let busy = false;
+
+  function render(msg) {
+    const box = el('wx'); if (!box) return;
+    const L = get(LK), C = get(CK);
+    if (!L) {
+      box.innerHTML = `<div class="wx-hd"><b>天氣預報</b></div>
+        <div class="small muted" style="margin:4px 0 8px">選擇地點後，首頁會顯示目前天氣與一週預報。</div>
+        <div class="btnrow"><button class="btn" id="wx-gps">📍 使用目前位置</button><button class="btn ghost" id="wx-pick">選擇縣市</button></div>`;
+      el('wx-gps').onclick = useGps; el('wx-pick').onclick = pick;
+      return;
+    }
+    const ok = C && C.k === keyOf(L) && C.d && C.d.current && C.d.daily;
+    let body = '';
+    if (ok) {
+      const c = C.d.current, d = C.d.daily, w = wmo(c.weather_code, c.is_day);
+      const rain0 = d.precipitation_probability_max ? d.precipitation_probability_max[0] : null;
+      body = `<div class="wx-now">
+          <div class="wx-ic">${w[1]}</div>
+          <div class="wx-t">${r0(c.temperature_2m)}<small>°C</small></div>
+          <div class="grow">
+            <div class="wx-tx">${h(w[0])}</div>
+            <div class="small muted">體感 ${r0(c.apparent_temperature)}° · 濕度 ${r0(c.relative_humidity_2m)}% · 風 ${bft(c.wind_speed_10m)} 級</div>
+            <div class="small">今天 ${r0(d.temperature_2m_min[0])}° ~ ${r0(d.temperature_2m_max[0])}°${rain0 != null ? ` · <span class="${rain0 >= 60 ? 'wx-wet' : ''}">降雨 ${rain0}%</span>` : ''}</div>
+          </div>
+        </div>
+        <div class="wx-days">${d.time.map((t, i) => {
+          const x = new Date(t + 'T00:00:00'), ww = wmo(d.weather_code[i], 1), p = d.precipitation_probability_max ? d.precipitation_probability_max[i] : null;
+          const nm = i === 0 ? '今天' : i === 1 ? '明天' : '週' + WK[x.getDay()];
+          return `<div class="wx-d${i === 0 ? ' on' : ''}"><div class="small">${nm}</div><div class="small muted">${x.getMonth() + 1}/${x.getDate()}</div>
+            <div class="wx-di" title="${h(ww[0])}">${ww[1]}</div><div class="wx-hi">${r0(d.temperature_2m_max[i])}°</div><div class="small muted">${r0(d.temperature_2m_min[i])}°</div>
+            ${p != null ? `<div class="small ${p >= 60 ? 'wx-wet' : 'muted'}">💧${p}%</div>` : ''}</div>`;
+        }).join('')}</div>`;
+    } else {
+      body = `<div class="small muted" style="padding:10px 0">${busy ? '讀取天氣中…' : '尚無天氣資料，連上網路後按「更新」。'}</div>`;
+    }
+    const stale = ok && Date.now() - C.at > TTL;
+    box.innerHTML = `<div class="wx-hd"><b>天氣</b><span class="wx-loc" id="wx-loc">${h(L.name)} ›</span>
+        <span class="grow"></span><span class="small muted">${ok ? (stale && !navigator.onLine ? '離線 · ' : '') + hm(C.at) + ' 更新' : ''}</span>
+        <button class="wx-rf" id="wx-rf" aria-label="更新天氣">${busy ? '…' : '↻'}</button></div>
+      ${body}${msg ? `<div class="small" style="color:var(--danger);margin-top:4px">${h(msg)}</div>` : ''}
+      <div class="wx-src">天氣資料：Open-Meteo.com</div>`;
+    el('wx-loc').onclick = pick;
+    el('wx-rf').onclick = () => load(true);
+  }
+
+  async function load(force) {
+    const L = get(LK); if (!L || busy) return;
+    const C = get(CK);
+    if (!force && C && C.k === keyOf(L) && Date.now() - C.at < TTL) { render(); return; }
+    busy = true; render();
+    let err = '';
+    try {
+      const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + L.lat + '&longitude=' + L.lon +
+        '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day' +
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+        '&timezone=Asia%2FTaipei&forecast_days=7';
+      const r = await fetch(u, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      if (!d.current || !d.daily) throw new Error('資料格式不符');
+      put(CK, { k: keyOf(L), at: Date.now(), d });
+    } catch (e) {
+      err = navigator.onLine ? '天氣讀取失敗，稍後再按 ↻ 更新' : '目前離線，顯示上次的天氣';
+    }
+    busy = false; render(force ? err : '');
+  }
+
+  function setLoc(name, lat, lon) {
+    put(LK, { name, lat: +lat, lon: +lon });
+    put(CK, null);
+    if (typeof closeSheet === 'function') closeSheet();
+    render(); load(true);
+  }
+
+  function useGps() {
+    if (!navigator.geolocation) { say('這個瀏覽器不支援定位，請改選縣市'); return; }
+    say('定位中…');
+    navigator.geolocation.getCurrentPosition(async p => {
+      const lat = +p.coords.latitude.toFixed(4), lon = +p.coords.longitude.toFixed(4);
+      let name = '目前位置';
+      try {
+        const r = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=zh');
+        const j = await r.json();
+        const a = (j.city || j.principalSubdivision || '').replace(/台/g, '臺'), b = j.locality || '';
+        if (a || b) name = a + (b && b !== a ? b : '');
+      } catch (e) { }
+      setLoc(name, lat, lon);
+    }, e => {
+      say(e.code === 1 ? '沒有定位權限，請在瀏覽器設定允許，或改選縣市' : '定位失敗，請改選縣市');
+    }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 600000 });
+  }
+
+  function pick() {
+    if (typeof openSheet !== 'function') return;
+    const L = get(LK);
+    openSheet(`<h3>天氣地點</h3>
+      <div class="small muted" style="margin-bottom:8px">地點只存在這台裝置。${L ? '目前：' + h(L.name) : ''}</div>
+      <button class="btn" id="wx-s-gps" style="width:100%;margin-bottom:10px">📍 使用目前位置</button>
+      <div class="wx-cities">${CITIES.map((c, i) => `<button class="chip${L && L.name === c[0] ? ' on' : ''}" data-wxc="${i}">${c[0]}</button>`).join('')}</div>
+      <div class="btnrow" style="margin-top:12px">${L ? '<button class="btn danger" id="wx-s-off">不顯示天氣</button>' : ''}<button class="btn ghost" id="wx-s-x">關閉</button></div>`);
+    el('wx-s-gps').onclick = useGps;
+    document.querySelectorAll('[data-wxc]').forEach(b => b.onclick = () => { const c = CITIES[+b.dataset.wxc]; setLoc(c[0], c[1], c[2]); });
+    if (el('wx-s-off')) el('wx-s-off').onclick = () => { put(LK, null); put(CK, null); closeSheet(); render(); };
+    el('wx-s-x').onclick = () => closeSheet();
+  }
+
+  render(); load(false);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(false); });
+  window.addEventListener('online', () => load(false));
+  window.wxT = { render, load, setLoc, CITIES };   // 測試用
 })();
 </script>
 </body>
