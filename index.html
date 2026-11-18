@@ -441,7 +441,7 @@ table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.5.2</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.5.3</p>
   </section>
 </main>
 
@@ -3088,8 +3088,11 @@ function sheetCalc(g) {
     .filter(([n]) => n && n.length <= 20 && !n.startsWith('=') && isNaN(Number(n.replace(/,/g, ''))) && !/[+\-*/()=,\s]/.test(n))
     .sort((a, b) => b[0].length - a[0].length);
   const reEsc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const allN = (g[0] || []).map(x => String(x ?? '').trim());
   const sub = (t, r) => {
-    if (!r || !hdr.length || !t) return t;
+    if (!r || !t) return t;
+    if (t.includes('[')) t = t.replace(/\[([^\]]+)\]/g, (m0, n) => { const i = allN.indexOf(n.trim()); return i >= 0 ? colName(i) + (r + 1) : m0; });
+    if (!hdr.length) return t;
     for (const [n, i] of hdr) if (t.includes(n)) t = t.replace(new RegExp('(^|[^A-Za-z0-9_])' + reEsc(n) + '(?![A-Za-z0-9_])', 'g'), '$1' + colName(i) + (r + 1));
     return t;
   };
@@ -3097,7 +3100,7 @@ function sheetCalc(g) {
     const t = sub(String((g[r] || [])[c] ?? '').trim(), r);
     return t.startsWith('=') ? t.slice(1).trim() : autoF(t);
   };
-  const named = x => { const l = hdr.filter(([n]) => String(x).includes(n)).map(([, i]) => i); return l.length ? l : null; };
+  const named = x => { const l = allN.map((n, i) => [n, i]).filter(([n]) => n && String(x).includes(n)).map(([, i]) => i); return l.length ? l : null; };
   const ref = s => { const m = /^([A-Z]+)(\d+)$/.exec(s); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return [Number(m[2]) - 1, c - 1]; };
   const val = (r, c) => {
     const k = r + ',' + c; if (k in memo) return memo[k];
@@ -3156,8 +3159,8 @@ async function sheetEdit(f, own, back) {
   norm();
   openSheet(`<h3>${f ? '編輯表格' : '新表格'}</h3>
     <label>檔名</label><input id="se-name" data-ime="zh" value="${esc(name)}">
-    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow">第 1 列打欄名 (例 定價、數量、金額)，金額欄打 數量*定價 就會用同一列計算，下面有資料的列自動帶入。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬。</span></div>
-    <div class="btnrow setb" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button><button class="btn ghost" id="se-sum" type="button">Σ 合計</button><button class="btn ghost" id="se-fit" type="button">自動欄寬</button></div>
+    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow">第 1 列打欄名 (例 定價、數量、金額)，任一格打 金額=數量*定價 (或按「ƒ 欄位公式」) 整欄自動計算；欄名可加中括號 [數量]。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬。</span></div>
+    <div class="btnrow setb" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button><button class="btn ghost" id="se-sum" type="button">Σ 合計</button><button class="btn ghost" id="se-fit" type="button">自動欄寬</button><button class="btn ghost" id="se-def" type="button">ƒ 欄位公式</button></div>
     <div class="gridwrap"><table class="grid" id="se-grid"></table></div>
     <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="se-x" type="button">取消</button><button class="btn ghost" id="se-dl" type="button">下載</button><button class="btn" id="se-ok" type="button">儲存</button></div>`);
   let calc = sheetCalc(g);
@@ -3169,7 +3172,7 @@ async function sheetEdit(f, own, back) {
   };
   draw();
   const grid = $('#se-grid');
-  grid.addEventListener('focusin', e => { const i = e.target.closest('input'); if (i) { sel = { r: +i.dataset.r, c: +i.dataset.c }; i.value = g[i.dataset.r][i.dataset.c]; } });
+  grid.addEventListener('focusin', e => { const i = e.target.closest('input'); if (i) { sel = { r: +i.dataset.r, c: +i.dataset.c, old: g[i.dataset.r][i.dataset.c] }; i.value = g[i.dataset.r][i.dataset.c]; } });
   grid.addEventListener('click', e => {   // 點欄名設定欄寬
     const h = e.target.closest('th[data-col]'); if (!h) return; const c = +h.dataset.col;
     const v = prompt(`${colName(c)} 欄寬 (字數，中文一字算 2；目前 ${cw[c] || CW0})`, cw[c] || CW0); if (v === null) return;
@@ -3178,6 +3181,24 @@ async function sheetEdit(f, own, back) {
   });
   grid.addEventListener('input', e => { const i = e.target.closest('input'); if (i) g[i.dataset.r][i.dataset.c] = i.value; });
   // 欄名公式 (例 金額欄打 數量*定價) : 同一欄下面空著、且該列被引用的欄有資料 -> 自動帶入同一算式
+  // 欄位公式 : 金額=數量*定價 或 [金額]=[數量]*[定價] -> 整欄有資料的列套用 ; 打字的那格還原
+  const hNames = () => (g[0] || []).map(x => String(x ?? '').trim());
+  const missName = txt => { const ns = hNames(); return [...String(txt).matchAll(/\[([^\]]+)\]/g)].map(x => x[1].trim()).filter(n => !ns.includes(n)); };
+  const colDef = (txt, at) => {
+    const m = /^\s*\[?([^\[\]=]+?)\]?\s*=\s*(.+)$/.exec(String(txt)); if (!m) return false;
+    const ns = hNames(), ci = ns.indexOf(m[1].trim()); if (ci < 0) return false;   // 左邊不是欄名 : 當一般內容
+    const rhs = m[2].trim(), miss = missName(rhs);
+    if (at) g[at.r][at.c] = at.old ?? '';
+    if (miss.length) { toast(`找不到欄名「${miss.join('、')}」，第 1 列的欄名是：${ns.filter(Boolean).join('、')}`, 6000); return true; }
+    calc = sheetCalc(g);
+    const cols = (calc.named(rhs) || []).filter(c => c !== ci);
+    if (!cols.length) { toast('算式裡要有其他欄的欄名，例：金額=數量*定價', 4000); return true; }
+    let n = 0;
+    for (let r = 1; r < R; r++) if (cols.some(c => String(g[r][c] ?? '').trim() !== '')) { g[r][ci] = rhs; n++; }
+    if (!n) g[1][ci] = rhs;   // 還沒有資料 : 先放第 2 列 , 之後輸入資料自動帶入
+    toast(`${ns[ci]} 欄已套用 ${rhs}${n ? ` (${n} 列)` : ''}`, 3500);
+    return true;
+  };
   const fillDown = () => {
     calc = sheetCalc(g);
     for (let c = 0; c < C; c++) {
@@ -3192,6 +3213,10 @@ async function sheetEdit(f, own, back) {
   };
   grid.addEventListener('focusout', e => {
     const i = e.target.closest('input'); if (!i) return;
+    const txt = String(g[i.dataset.r][i.dataset.c] ?? '');
+    if (!colDef(txt, sel && sel.r === +i.dataset.r && sel.c === +i.dataset.c ? sel : { r: +i.dataset.r, c: +i.dataset.c, old: '' }) && +i.dataset.r > 0) {
+      const miss = missName(txt); if (miss.length) toast(`找不到欄名「${miss.join('、')}」，第 1 列的欄名是：${hNames().filter(Boolean).join('、')}`, 6000);
+    }
     fillDown();
     for (const x of grid.querySelectorAll('input')) if (x !== document.activeElement || x === i) { const v = calc.val(+x.dataset.r, +x.dataset.c); x.value = show(+x.dataset.r, +x.dataset.c); x.classList.toggle('num', typeof v === 'number'); x.classList.toggle('fx', !!calc.form(+x.dataset.r, +x.dataset.c)); }
   });
@@ -3200,6 +3225,13 @@ async function sheetEdit(f, own, back) {
     const n = grid.querySelector(`input[data-r="${+i.dataset.r + 1}"][data-c="${i.dataset.c}"]`); if (n) n.focus(); else i.blur();
   });
   $('#se-ar').onclick = () => { R++; norm(); draw(); };
+  $('#se-def').onclick = () => {
+    const ns = hNames().filter(Boolean);
+    const v = prompt(`欄位公式 (例：金額=數量*定價)\n第 1 列的欄名：${ns.join('、') || '(還沒有，請先在第 1 列打欄名)'}`, '');
+    if (v === null || !v.trim()) return;
+    if (!colDef(v.trim(), null)) { toast('格式：欄名=算式，例 金額=數量*定價 (左邊要是第 1 列的欄名)', 5000); return; }
+    fillDown(); draw();
+  };
   $('#se-fit').onclick = () => {
     calc = sheetCalc(g);
     for (let c = 0; c < C; c++) { let w = 0; for (let r = 0; r < R; r++) w = Math.max(w, dispW(show(r, c))); cw[c] = w ? Math.min(40, Math.max(4, w + 1)) : CW0; }
