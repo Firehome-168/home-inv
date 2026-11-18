@@ -1,5 +1,5 @@
 // 家用進銷存 service worker : 離線可用 (程式檔快取 , 資料在 IndexedDB 不經過這裡)
-const CACHE = 'homeinv-v39';
+const CACHE = 'homeinv-v40';
 const FILES = ['./', './index.html', './manifest.json', './firebase-config.js', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -11,8 +11,8 @@ self.addEventListener('activate', e => {
 // 先用網路取最新版 , 沒網路時用快取
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
-  // 雲端同步程式庫 (Firebase SDK , 固定版本) : 先用快取 , 離線也能開
-  if (e.request.method === 'GET' && u.hostname === 'www.gstatic.com' && u.pathname.startsWith('/firebasejs/')) {
+  // 雲端同步程式庫 (Firebase SDK) 與 Excel/PDF/Word 元件 (cdnjs , 固定版本) : 先用快取 , 離線也能開
+  if (e.request.method === 'GET' && ((u.hostname === 'www.gstatic.com' && u.pathname.startsWith('/firebasejs/')) || (u.hostname === 'cdnjs.cloudflare.com' && u.pathname.startsWith('/ajax/libs/')))) {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return res;
     })));

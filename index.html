@@ -195,7 +195,41 @@ video{width:100%;border-radius:10px;background:#000}
 table{width:100%;border-collapse:collapse;font-size:14px}
 td,th{padding:6px 4px;border-bottom:1px solid var(--line)}
 th{color:var(--muted);font-weight:600;text-align:left}
+#printArea{display:none}
+@media print{
+  body>*:not(#printArea){display:none!important}
+  html,body{background:#fff!important}
+  #printArea{display:block;color:#000;font:10pt/1.4 "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif}
+  #printArea h1{font-size:15pt;margin:0 0 4pt}
+  #printArea h2{font-size:12pt;margin:10pt 0 4pt}
+  #printArea p{margin:0 0 2pt}
+  #printArea table{width:100%;border-collapse:collapse;font-size:9pt}
+  #printArea th,#printArea td{border:.5pt solid #777;padding:2pt 4pt;color:#000;text-align:left}
+  #printArea th{background:#e8eee8;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printArea thead{display:table-header-group}
+  #printArea tr{break-inside:avoid}
+  #printArea td.n{text-align:right;white-space:nowrap}
+  #printArea .ft{margin-top:8pt;color:#555;font-size:8pt}
+}
+.gridwrap{overflow:auto;max-height:58vh;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
+.grid th{position:sticky;top:0;z-index:2;background:var(--brand-soft);color:var(--muted);font-weight:600;text-align:center;padding:2px 6px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);min-width:32px}
+.grid th.rh{left:0;z-index:1}
+.grid thead th.rh{z-index:3}
+.grid td{padding:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+.grid td input{width:104px;min-height:34px;border:0;border-radius:0;padding:4px 6px;font-size:15px;background:transparent}
+.grid td input.num{text-align:right}
+.grid td input.fx{color:var(--sale)}
+.grid td input:focus{outline:2px solid var(--brand);outline-offset:-2px;background:var(--card)}
+.fpv{overflow-x:auto}
+.pdfpg{display:block;width:100%;height:auto;margin:0 0 8px;background:#fff;box-shadow:var(--shadow)}
+.docv{background:var(--card);padding:12px;border-radius:8px;overflow-wrap:anywhere}.docv img{max-width:100%}.docv table{width:auto}.docv td{border:1px solid var(--line)}
+.xlv{overflow:auto;margin-bottom:12px}.xlv table{width:auto}.xlv td{border:1px solid var(--line);white-space:nowrap;padding:3px 6px}
+.txv{white-space:pre-wrap;word-break:break-word;background:var(--card);padding:12px;border-radius:8px;font:inherit;margin:0}
+.att .btnrow .btn{flex:1 1 auto}
+.rpt .btn{flex:1 1 40%}
 </style>
+<style id="printPage"></style>
 </head>
 <body>
 <header>
@@ -358,14 +392,26 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <p class="small muted">資料只存在這支手機。換手機、清除瀏覽器資料或刪除 APP 都會遺失，請定期備份，並把備份檔存到雲端硬碟或電腦。</p>
     </div>
     <div class="card">
-      <h2>匯出 Excel (CSV)</h2>
-      <div class="btnrow">
+      <h2>匯出報表 (Excel / Word / PDF)</h2>
+      <div class="chips" id="expFmt" style="flex-wrap:wrap"></div>
+      <div class="btnrow rpt">
         <button class="btn ghost" id="btnCsvTx">購入/使用/銷售紀錄</button>
         <button class="btn ghost" id="btnCsvStock">目前庫存</button>
         <button class="btn ghost" id="btnCsvCust">客戶名單</button>
         <button class="btn ghost" id="btnCsvAcct">帳戶收支</button>
       </div>
+      <p class="small muted">先點上面選格式，再按要匯出的報表。PDF：會跳出列印畫面，印表機選「另存為 PDF / 存成 PDF」(iPhone 在預覽圖上用兩指放大後按分享)。Excel 第一次使用要連網路下載元件。</p>
     </div>
+    <div class="card">
+      <h2>從 Excel 匯入物品</h2>
+      <div class="btnrow">
+        <button class="btn ghost" id="btnImpItems">選擇檔案 (.xlsx .xls .ods .csv)</button>
+        <button class="btn ghost" id="btnImpTpl">下載匯入範本</button>
+      </div>
+      <input type="file" id="fileImpItems" accept=".xlsx,.xls,.ods,.csv" hidden>
+      <p class="small muted">第一列是欄名：品名 (必填)、部門、分類、單位、售價、存放位置、安全存量、條碼、備註。條碼或品名相同的物品會更新，其他新增。庫存數量不匯入，請用「購入」記錄。匯出的「目前庫存」Excel 也可以改完再匯入。</p>
+    </div>
+    <div id="docBox"></div>
     <div class="card">
       <h2>店家</h2>
       <ul class="list" id="shopList"></ul>
@@ -392,7 +438,7 @@ th{color:var(--muted);font-weight:600;text-align:left}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.4</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.5</p>
   </section>
 </main>
 
@@ -692,12 +738,13 @@ const DB = {
   open() {
     // 所有存取都先等資料庫開好 (第一次開啟可能較慢 , 避免太快點擊時資料沒存到)
     return this.ready = this.ready || new Promise((ok, bad) => {
-      const r = indexedDB.open('homeinv', 6);
-      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders ; v5 : 庫存彙整 snaps ; v6 : 記事 notes (舊資料保留)
+      const r = indexedDB.open('homeinv', 7);
+      r.onupgradeneeded = () => {   // v2 : 加客戶 custs ; v3 : 加帳戶 accts , 收支 moves ; v4 : 訂單 orders ; v5 : 庫存彙整 snaps ; v6 : 記事 notes ; v7 : 附件/文件 files (舊資料保留)
         const d = r.result;
         for (const s of ['items', 'shops', 'txns', 'custs', 'accts', 'moves', 'orders', 'snaps', 'notes'])
           if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true });
         if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
+        if (!d.objectStoreNames.contains('files')) d.createObjectStore('files', { keyPath: 'id' }).createIndex('own', 'own');   // v7 : 附件/文件 (只存本機 , 不同步)
       };
       // 資料庫要升級時 , 其他開著舊版的視窗/分頁會卡住升級 (這時存檔完全沒反應) : 提示關掉 ; 舊版那邊收到通知就關閉連線並重新載入
       r.onblocked = () => alert('家用進銷存有其他視窗或分頁還開著舊版，資料庫無法升級，存檔會沒有反應。\n請把其他家用進銷存的視窗、分頁全部關掉，再重新開啟這個。');
@@ -1356,7 +1403,7 @@ function itemForm(id, preset, done) {
     if (!confirm(`刪除「${it.name}」${n ? `，連同 ${n} 筆紀錄` : ''}？`)) return;
     for (const t of S.txns.filter(t => t.itemId === id)) await DB.del('txns', t.id);
     S.txns = S.txns.filter(t => t.itemId !== id);
-    await DB.del('items', id); S.items = S.items.filter(x => x.id !== id);
+    await DB.del('items', id); S.items = S.items.filter(x => x.id !== id); filesDelOwn('item:' + id);
     closeSheet(); toast('已刪除'); render();
   };
 }
@@ -1377,7 +1424,9 @@ function itemDetail(id) {
     </div>
     <div class="btnrow" style="margin-bottom:12px">
       <button class="btn" id="d-in">＋ 購入</button>${it.noStock ? '' : '<button class="btn out" id="d-out">－ 使用</button><button class="btn sale" id="d-sale">$ 銷售</button>'}<button class="btn ghost" id="d-edit">修改</button></div>
+    ${attachHtml('附件', '附加檔案 (PDF、Word、Excel、照片)')}
     <div class="card"><h2>紀錄 (${hist.length})</h2><ul class="list">${hist.map(txnRow).join('') || '<li class="empty">尚無紀錄</li>'}</ul></div>`);
+  attachInit($('#sheet .att'), 'item:' + id, () => itemDetail(id));
   $('#d-in').onclick = () => txnForm('in', null, id);
   if ($('#d-out')) $('#d-out').onclick = () => txnForm('out', null, id);
   if ($('#d-sale')) $('#d-sale').onclick = () => txnForm('sale', null, id);
@@ -1887,6 +1936,7 @@ function orderDetail(id) {
       ${st === '已出貨' ? '<button class="btn" id="od-done">完成</button><button class="btn ghost" id="od-notice">傳出貨通知</button>' : ''}
       ${['待收款', '待出貨', '已出貨'].includes(st) ? '<button class="btn danger" id="od-cancel">取消訂單</button>' : '<button class="btn danger" id="od-del">刪除</button>'}
     </div>
+    <div class="btnrow" style="margin-top:8px"><button class="btn ghost" id="od-pdf">列印 / PDF</button><button class="btn ghost" id="od-docx">Word</button><button class="btn ghost" id="od-xlsx">Excel</button></div>
     ${st === '待收款' && o.pay === '轉帳' ? '<p class="small muted">轉帳訂單：請先核對銀行入帳 (末5碼) 再按收款結帳。</p>' : ''}
     ${st === '待出貨' || st === '已出貨' ? '<p class="small warn" style="color:var(--warn)">已結帳的訂單取消時，銷售紀錄不會自動刪除，請到銷售紀錄自行刪除或改退款。</p>' : ''}`);
   const on = (sel, fn) => { const b = $(sel); if (b) b.onclick = fn; };
@@ -1898,6 +1948,7 @@ function orderDetail(id) {
   });
   on('#od-ship', () => orderShipForm(o));
   on('#od-notice', () => orderNotice(o));
+  for (const f of ['pdf', 'docx', 'xlsx']) on('#od-' + f, () => exportRpt(rptOrder(o), f));
   on('#od-done', async () => { o.status = '已完成'; await orderSave(o); closeSheet(); toast('訂單已完成'); render(); });
   on('#od-cancel', async () => { if (!confirm(`取消訂單 ${o.no}？`)) return; o.status = '已取消'; await orderSave(o); closeSheet(); toast('訂單已取消'); render(); });
   on('#od-del', async () => { if (!confirm(`刪除訂單 ${o.no}？`)) return; await DB.del('orders', o.id); S.orders = S.orders.filter(x => x.id !== o.id); closeSheet(); toast('已刪除'); render(); });
@@ -1988,16 +2039,12 @@ function snapDetail(id) {
     <div class="card small"><div>彙整裝置：${esc(s.by || '')}${s.note ? '　備註：' + esc(s.note) : ''}</div>
       <div>共 ${s.rows.length} 項 · 庫存金額 <b>$${fmt(s.val)}</b> · 現在 $${fmt(curVal)}</div>
       <div class="muted">${Cloud.on ? '已同步到家庭雲端' : '只存在這台'}</div></div>
-    <div class="btnrow" style="margin-bottom:12px"><button class="btn ghost" id="sd-share">分享盤點明細 (內部用)</button><button class="btn ghost" id="sd-csv">下載 CSV</button><button class="btn danger" id="sd-del">刪除</button></div>
+    <div class="btnrow" style="margin-bottom:12px"><button class="btn ghost" id="sd-share">分享盤點明細 (內部用)</button><button class="btn ghost" id="sd-xlsx">Excel</button><button class="btn ghost" id="sd-docx">Word</button><button class="btn ghost" id="sd-pdf">PDF / 列印</button><button class="btn ghost" id="sd-csv">CSV</button><button class="btn danger" id="sd-del">刪除</button></div>
     <div class="card"><ul class="list">${rows}</ul></div>
     <button class="btn ghost" style="width:100%" id="sd-back">‹ 彙整紀錄</button>`);
   $('#sd-back').onclick = snapList;
   $('#sd-share').onclick = () => shareText(snapText(s));
-  $('#sd-csv').onclick = () => {
-    const out = [['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '售價', '安全存量', '現在庫存', '差異']];
-    for (const r of s.rows) { const it = itemById(r.i), now = it ? stockOf(r.i).qty : ''; out.push([r.d, r.c, r.n, r.q, r.u, r.a, r.v, r.sp || '', r.sf || '', now, it ? Math.round((now - r.q) * 100) / 100 : '']); }
-    saveFile(`${appName()}庫存彙整_${s.date.replace(/-/g, '')}_${hhmm(s.at).replace(':', '')}.csv`, csv(out), 'text/csv');
-  };
+  for (const f of ['xlsx', 'docx', 'pdf', 'csv']) $('#sd-' + f).onclick = () => exportRpt(rptSnap(s), f);
   $('#sd-del').onclick = async () => {
     if (!confirm(`刪除 ${snapWhen(s)} 的庫存彙整？${Cloud.on ? '\n家人那邊也會一起刪除。' : ''}`)) return;
     await DB.del('snaps', s.id); S.snaps = S.snaps.filter(x => x.id !== s.id); toast('已刪除'); snapList();
@@ -2497,6 +2544,7 @@ function lineChart(labels, series) {
 
 /* ========== 設定 ========== */
 function renderSet() {
+  renderDocs();
   const bk = S.meta.lastBackup;
   $('#bkInfo').textContent = `物品 ${S.items.length} 筆、客戶 ${S.custs.length} 筆、帳戶 ${S.accts.length} 個、紀錄 ${S.txns.length + S.moves.length} 筆。` + (bk ? `上次備份：${roc(new Date(bk - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}` : '尚未備份過。');
   $('#shopList').innerHTML = S.shops.map(s => `<li><div class="grow">${esc(s.name)}</div><span class="small muted">${S.txns.filter(t => t.shopId === s.id).length} 筆</span>
@@ -2646,47 +2694,16 @@ $('#fileRestore').onchange = async e => {
   applyAppName(); toast('還原完成'); show('home');
 };
 function csv(rows) { return '﻿' + rows.map(r => r.map(v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n'); }
-$('#btnCsvTx').onclick = () => {
-  const rows = [['日期', '類別', '部門', '分類', '品名', '數量', '單位', '單價', '金額', '店家/客戶', '付款', '有效期限', '備註']];
-  for (const t of [...S.txns].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
-    const it = itemById(t.itemId) || {};
-    const amt = t.type === 'in' || t.type === 'sale';
-    rows.push([roc(t.date), { in: '購入', out: '使用', sale: t.amount ? '銷售' : '分享' }[t.type], it.dept, it.cat, it.name, t.qty, it.unit, amt ? t.price : '', amt ? t.amount : '', t.type === 'sale' ? custName(t) : shopName(t.shopId), acctName(t.acctId) || t.pay || '', roc(t.expiry), t.note]);
-  }
-  saveFile(`${appName()}紀錄_${stamp()}.csv`, csv(rows), 'text/csv');
-};
-$('#btnCsvAcct').onclick = () => {
-  const rows = [['日期', '類別', '帳戶', '轉入帳戶', '部門', '項目', '收入', '支出', '備註']];
-  const all = [...S.moves.map(m => ({ d: m.date, id: m.id, r: [roc(m.date), { inc: '收入', exp: '支出', xfer: '轉帳' }[m.type], acctName(m.acctId), acctName(m.toId), m.dept || '', m.cat || '',
-      m.type === 'inc' ? m.amount : m.type === 'xfer' ? m.amount : '', m.type === 'exp' ? m.amount : '', m.note || ''] })),
-    ...S.txns.filter(t => t.amount && (t.type === 'in' || t.type === 'sale')).map(t => { const it = itemById(t.itemId) || {};
-      return { d: t.date, id: t.id, r: [roc(t.date), t.type === 'in' ? '購入' : '銷售', acctName(t.acctId), '', it.dept || '', it.name || '', t.type === 'sale' ? t.amount : '', t.type === 'in' ? t.amount : '', t.note || ''] }; })]
-    .sort((a, b) => a.d.localeCompare(b.d) || a.id - b.id);
-  for (const x of all) rows.push(x.r);
-  rows.push([]); rows.push(['帳戶', '類別', '期初', '目前餘額']);
-  for (const a of S.accts) rows.push([a.name, a.type, a.open || 0, acctBal(a.id)]);
-  saveFile(`${appName()}帳戶收支_${stamp()}.csv`, csv(rows), 'text/csv');
-};
-$('#btnCsvCust').onclick = () => {
-  const rows = [['代碼', '姓名', '類別', '電話', '地址', '備註', '銷售筆數', '銷售金額', '最近日期']];
-  for (const c of [...S.custs].sort((a, b) => (a.code || '').localeCompare(b.code || ''))) {
-    const st = custStat(c.id); rows.push([c.code, c.name, c.kind, c.phone, c.addr, c.note, st.n, st.amt, roc(st.last)]);
-  }
-  saveFile(`${appName()}客戶_${stamp()}.csv`, csv(rows), 'text/csv');
-};
-$('#btnCsvStock').onclick = () => {
-  const rows = [['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '存放位置', '安全存量', '條碼']];
-  for (const it of [...S.items].sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept))) {
-    if (it.noStock) continue; const s = stockOf(it.id);
-    rows.push([it.dept, it.cat, it.name, s.qty, it.unit, Math.round(s.avg * 100) / 100, Math.round(s.qty * s.avg), it.loc, it.safe || '', it.barcode]);
-  }
-  saveFile(`${appName()}庫存_${stamp()}.csv`, csv(rows), 'text/csv');
-};
+$('#btnCsvTx').onclick = () => exportRpt(rptTx());
+$('#btnCsvAcct').onclick = () => exportRpt(rptAcct());
+$('#btnCsvCust').onclick = () => exportRpt(rptCust());
+$('#btnCsvStock').onclick = () => exportRpt(rptStock());
 $('#btnWipe').onclick = async () => {
   if (!confirm(Cloud.on ? '清除全部家人的家庭資料？(雲端也會清除)' : '清除這支手機上的全部資料？')) return;
   if (prompt('確定要清除，請輸入「清除」兩個字') !== '清除') return;
   const prevKeys = Cloud.on ? Cloud.allKeys() : [];
   await DB.tx([...STORES, 'meta'], 'readwrite', t => { for (const s of [...STORES, 'meta']) t.objectStore(s).clear(); });
+  await DB.tx('files', 'readwrite', t => t.objectStore('files').clear());
   await loadAll(); await migrateAccts();
   if (Cloud.on) await Cloud.uploadAll(prevKeys);
   applyTheme(); applyAppName(); toast('已清除'); show('home');
@@ -2748,6 +2765,433 @@ async function migrateAccts() {
   Cloud.boot();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
+</script>
+<script>
+/* ===== v3.5 Excel / Word / PDF 報表、附件與文件 (文字檔、表格) =====
+   元件第一次用到才從 cdnjs 下載 (sw.js 會快取 , 之後離線可用) :
+     SheetJS (Excel 讀寫)、pdf.js (PDF 預覽)、mammoth (Word .docx 預覽)
+   Word 匯出自己組 .docx (不需元件) ; PDF 用手機/電腦的「列印 → 存成 PDF」(中文不用另外下載字型)
+   附件與文件存 IndexedDB files (只存在這台 , 不同步、不含在備份) */
+const CDN = 'https://cdnjs.cloudflare.com/ajax/libs/';
+const LIB = { xlsx: CDN + 'xlsx/0.18.5/xlsx.full.min.js', pdf: CDN + 'pdf.js/3.11.174/pdf.min.js', mammoth: CDN + 'mammoth/1.6.0/mammoth.browser.min.js' };
+const PDF_WORKER = CDN + 'pdf.js/3.11.174/pdf.worker.min.js', PDF_CMAP = CDN + 'pdf.js/3.11.174/cmaps/';
+const libP = {};
+function loadLib(k) {
+  return libP[k] = libP[k] || new Promise((ok, bad) => {
+    const s = document.createElement('script'); s.src = LIB[k];
+    s.onload = () => ok();
+    s.onerror = () => { delete libP[k]; s.remove(); bad(new Error('第一次使用要連上網路下載元件，請連網後再試')); };
+    document.head.appendChild(s);
+  });
+}
+const dispW = s => [...String(s ?? '')].reduce((a, c) => a + (c.charCodeAt(0) > 255 ? 2 : 1), 0);
+const cellTxt = v => typeof v === 'number' ? fmtQ(v) : String(v ?? '');
+
+/* ---------- 報表資料 : { title, file, info:[文字], sheets:[{ name, head, rows }] } ---------- */
+function rptTx() {
+  const rows = [];
+  for (const t of [...S.txns].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)) {
+    const it = itemById(t.itemId) || {};
+    const amt = t.type === 'in' || t.type === 'sale';
+    rows.push([roc(t.date), { in: '購入', out: '使用', sale: t.amount ? '銷售' : '分享' }[t.type], it.dept, it.cat, it.name, t.qty, it.unit, amt ? t.price : '', amt ? t.amount : '', t.type === 'sale' ? custName(t) : shopName(t.shopId), acctName(t.acctId) || t.pay || '', roc(t.expiry), t.note]);
+  }
+  return { title: appName() + ' 購入/使用/銷售紀錄', file: appName() + '紀錄_' + stamp(), info: [],
+    sheets: [{ name: '紀錄', head: ['日期', '類別', '部門', '分類', '品名', '數量', '單位', '單價', '金額', '店家/客戶', '付款', '有效期限', '備註'], rows }] };
+}
+function rptAcct() {
+  const all = [...S.moves.map(m => ({ d: m.date, id: m.id, r: [roc(m.date), { inc: '收入', exp: '支出', xfer: '轉帳' }[m.type], acctName(m.acctId), acctName(m.toId), m.dept || '', m.cat || '',
+      m.type === 'inc' ? m.amount : m.type === 'xfer' ? m.amount : '', m.type === 'exp' ? m.amount : '', m.note || ''] })),
+    ...S.txns.filter(t => t.amount && (t.type === 'in' || t.type === 'sale')).map(t => { const it = itemById(t.itemId) || {};
+      return { d: t.date, id: t.id, r: [roc(t.date), t.type === 'in' ? '購入' : '銷售', acctName(t.acctId), '', it.dept || '', it.name || '', t.type === 'sale' ? t.amount : '', t.type === 'in' ? t.amount : '', t.note || ''] }; })]
+    .sort((a, b) => a.d.localeCompare(b.d) || a.id - b.id);
+  return { title: appName() + ' 帳戶收支', file: appName() + '帳戶收支_' + stamp(), info: [], sheets: [
+    { name: '收支明細', head: ['日期', '類別', '帳戶', '轉入帳戶', '部門', '項目', '收入', '支出', '備註'], rows: all.map(x => x.r) },
+    { name: '帳戶餘額', head: ['帳戶', '類別', '期初', '目前餘額'], rows: S.accts.map(a => [a.name, a.type, a.open || 0, acctBal(a.id)]) }] };
+}
+function rptCust() {
+  const rows = [...S.custs].sort((a, b) => (a.code || '').localeCompare(b.code || '')).map(c => { const st = custStat(c.id); return [c.code, c.name, c.kind, c.phone, c.addr, c.note, st.n, st.amt, roc(st.last)]; });
+  return { title: appName() + ' 客戶名單', file: appName() + '客戶_' + stamp(), info: [],
+    sheets: [{ name: '客戶', head: ['代碼', '姓名', '類別', '電話', '地址', '備註', '銷售筆數', '銷售金額', '最近日期'], rows }] };
+}
+function rptStock() {
+  const rows = [];
+  for (const it of [...S.items].sort((a, b) => DEPTS.indexOf(a.dept) - DEPTS.indexOf(b.dept))) {
+    if (it.noStock) continue; const s = stockOf(it.id);
+    rows.push([it.dept, it.cat, it.name, s.qty, it.unit, Math.round(s.avg * 100) / 100, Math.round(s.qty * s.avg), it.loc, it.safe || '', it.barcode]);
+  }
+  return { title: appName() + ' 目前庫存', file: appName() + '庫存_' + stamp(), info: ['日期：' + roc(today())],
+    sheets: [{ name: '庫存', head: ['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '存放位置', '安全存量', '條碼'], rows }] };
+}
+function rptSnap(s) {
+  const rows = s.rows.map(r => { const it = itemById(r.i), now = it ? stockOf(r.i).qty : ''; return [r.d, r.c, r.n, r.q, r.u, r.a, r.v, r.sp || '', r.sf || '', now, it ? Math.round((now - r.q) * 100) / 100 : '']; });
+  return { title: appName() + ' 庫存彙整 ' + snapWhen(s), file: `${appName()}庫存彙整_${s.date.replace(/-/g, '')}_${hhmm(s.at).replace(':', '')}`,
+    info: [`彙整裝置：${s.by || ''}${s.note ? '　備註：' + s.note : ''}`, `共 ${s.rows.length} 項，庫存金額 $${fmt(s.val)}`],
+    sheets: [{ name: '庫存彙整', head: ['部門', '分類', '品名', '庫存', '單位', '平均單價', '庫存金額', '售價', '安全存量', '現在庫存', '差異'], rows }] };
+}
+function rptOrder(o) {
+  const rows = o.lines.map(l => { const it = itemById(l.id) || { name: '(已刪除物品)', unit: '' }, p = l.price || priceOf(it); return [it.name, l.qty, it.unit || '', p, Math.round(l.qty * p)]; });
+  const sub = orderSum(o), fee = o.fee || 0;
+  rows.push(['商品小計', '', '', '', sub], ['運費', '', '', '', fee], ['應收', '', '', '', sub + fee]);
+  return { title: `${appName()} 訂購單 ${o.no}`, file: `${appName()}訂單_${o.no}`,
+    info: [`日期：${roc(o.date)}　狀態：${o.status}`, `客戶：${o.name || ''}　電話：${o.phone || ''}`,
+      `取貨：${o.ship || ''}${o.ship === '宅配' ? '　地址：' + (o.addr || '(未填)') : ''}`, `付款：${o.pay || ''}${o.last5 ? '　轉帳末5碼：' + o.last5 : ''}`,
+      ...(o.track ? [`出貨：${o.carrier || ''} 單號 ${o.track} (${roc(o.shipDate || '')})`] : []), ...(o.note ? ['備註：' + o.note] : [])],
+    sheets: [{ name: '訂購明細', head: ['品名', '數量', '單位', '單價', '金額'], rows }] };
+}
+
+/* ---------- 匯出 ---------- */
+const EXP_FMTS = [['xlsx', 'Excel'], ['docx', 'Word'], ['pdf', 'PDF / 列印'], ['csv', 'CSV']];
+const expFmt = () => lsG('exp_fmt') || 'xlsx';
+function expFmtUI() {
+  const b = $('#expFmt'); if (!b) return;
+  b.innerHTML = EXP_FMTS.map(([k, n]) => `<button class="chip ${expFmt() === k ? 'on' : ''}" data-f="${k}" type="button">${n}</button>`).join('');
+  b.onclick = e => { const c = e.target.closest('[data-f]'); if (c) { lsS('exp_fmt', c.dataset.f); expFmtUI(); } };
+}
+async function exportRpt(rep, f = expFmt()) {
+  try {
+    if (f === 'pdf') return printRpt(rep);
+    if (f === 'csv') {
+      const rows = [...rep.info.map(x => [x])]; rep.sheets.forEach((sh, i) => { if (i || rows.length) rows.push([]); if (rep.sheets.length > 1) rows.push([sh.name]); rows.push(sh.head, ...sh.rows); });
+      return saveFile(rep.file + '.csv', csv(rows), 'text/csv');
+    }
+    if (f === 'docx') return saveBlobs([{ name: rep.file + '.docx', blob: buildDocx(rep) }]);
+    toast('產生 Excel 中…');
+    await loadLib('xlsx');
+    const wb = XLSX.utils.book_new(), used = new Set();
+    for (const sh of rep.sheets) {
+      const top = rep.sheets.length === 1 || sh === rep.sheets[0] ? [[rep.title], ...rep.info.map(x => [x]), []] : [];
+      const ws = XLSX.utils.aoa_to_sheet([...top, sh.head, ...sh.rows]);
+      ws['!cols'] = sh.head.map((h, i) => ({ wch: Math.min(40, Math.max(6, dispW(h), ...sh.rows.slice(0, 500).map(r => dispW(cellTxt(r[i])))) + 2) }));
+      let n = String(sh.name).replace(/[\\/?*[\]:]/g, '').slice(0, 31) || 'Sheet'; while (used.has(n)) n = n.slice(0, 28) + used.size; used.add(n);
+      XLSX.utils.book_append_sheet(wb, ws, n);
+    }
+    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    return saveBlobs([{ name: rep.file + '.xlsx', blob: new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) }]);
+  } catch (e) { toast('匯出失敗：' + (e.message || e), 4000); }
+}
+function rptHtml(rep) {
+  return `<h1>${esc(rep.title)}</h1>${rep.info.map(x => `<p>${esc(x)}</p>`).join('')}` +
+    rep.sheets.map(sh => `${rep.sheets.length > 1 ? `<h2>${esc(sh.name)}</h2>` : ''}<table><thead><tr>${sh.head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>` +
+      sh.rows.map(r => `<tr>${sh.head.map((_, i) => `<td${typeof r[i] === 'number' ? ' class="n"' : ''}>${esc(cellTxt(r[i]))}</td>`).join('')}</tr>`).join('') + '</tbody></table>').join('') +
+    `<p class="ft">${esc(appName())} · 列印日期 ${roc(today())}</p>`;
+}
+function printRpt(rep) {
+  if (typeof window.print !== 'function') { toast('這個瀏覽器不能列印，請改用 Excel 或 Word'); return; }
+  let pa = $('#printArea'); if (!pa) { pa = document.createElement('div'); pa.id = 'printArea'; document.body.appendChild(pa); }
+  pa.innerHTML = rptHtml(rep);
+  const wide = Math.max(...rep.sheets.map(s => s.head.length)) > 7;
+  $('#printPage').textContent = `@page{size:A4 ${wide ? 'landscape' : 'portrait'};margin:10mm}`;
+  const t0 = document.title; document.title = rep.file;   // 存成 PDF 時的預設檔名
+  const back = () => { document.title = t0; window.removeEventListener('afterprint', back); };
+  window.addEventListener('afterprint', back);
+  setTimeout(() => window.print(), 60);
+}
+
+/* ---------- 自己組 .docx / zip (不壓縮) ---------- */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u) { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = CRC_T[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files, type) {   // [{ name, data: 字串或 Uint8Array }]
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  for (const f of files) {
+    const nm = enc.encode(f.name), d = typeof f.data === 'string' ? enc.encode(f.data) : f.data, c = crc32(d);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(12, 0x21, true);
+    h.setUint32(14, c, true); h.setUint32(18, d.length, true); h.setUint32(22, d.length, true); h.setUint16(26, nm.length, true);
+    parts.push(new Uint8Array(h.buffer), nm, d);
+    const ce = new DataView(new ArrayBuffer(46));
+    ce.setUint32(0, 0x02014b50, true); ce.setUint16(4, 20, true); ce.setUint16(6, 20, true); ce.setUint16(8, 0x0800, true); ce.setUint16(14, 0x21, true);
+    ce.setUint32(16, c, true); ce.setUint32(20, d.length, true); ce.setUint32(24, d.length, true); ce.setUint16(28, nm.length, true); ce.setUint32(42, off, true);
+    cen.push(new Uint8Array(ce.buffer), nm);
+    off += 30 + nm.length + d.length;
+  }
+  const cs = cen.reduce((s, a) => s + a.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cs, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...cen, new Uint8Array(e.buffer)], { type });
+}
+const xmlEsc = s => String(s ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function docxP(t, o = {}) {
+  const sz = o.sz || 20;
+  const run = t === '' ? '' : `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="微軟正黑體"/>${o.b ? '<w:b/>' : ''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xmlEsc(t)}</w:t></w:r>`;
+  return `<w:p><w:pPr><w:spacing w:before="0" w:after="${o.after ?? 60}"/>${o.jc ? `<w:jc w:val="${o.jc}"/>` : ''}</w:pPr>${run}</w:p>`;
+}
+function buildDocx(rep) {
+  const wide = Math.max(...rep.sheets.map(s => s.head.length)) > 7, pw = wide ? 16838 : 11906, ph = wide ? 11906 : 16838, mar = 720, tw = pw - 2 * mar;
+  let body = docxP(rep.title, { b: 1, sz: 30, after: 120 }) + rep.info.map(x => docxP(x)).join('');
+  for (const sh of rep.sheets) {
+    if (rep.sheets.length > 1) body += docxP(sh.name, { b: 1, sz: 24, after: 80 });
+    const cw = sh.head.map((h, i) => Math.min(30, Math.max(4, dispW(h), ...sh.rows.slice(0, 300).map(r => dispW(cellTxt(r[i])))))), tot = cw.reduce((a, b) => a + b, 0);
+    const gw = cw.map(c => Math.floor(tw * c / tot));
+    const cell = (v, i, hd) => `<w:tc><w:tcPr><w:tcW w:w="${gw[i]}" w:type="dxa"/>${hd ? '<w:shd w:val="clear" w:color="auto" w:fill="E8EEE8"/>' : ''}</w:tcPr>${docxP(cellTxt(v), { sz: 18, after: 0, b: hd, jc: !hd && typeof v === 'number' ? 'right' : '' })}</w:tc>`;
+    body += `<w:tbl><w:tblPr><w:tblW w:w="${tw}" w:type="dxa"/><w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(b => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="999999"/>`).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="60" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar></w:tblPr>` +
+      `<w:tblGrid>${gw.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>` +
+      `<w:tr><w:trPr><w:tblHeader/></w:trPr>${sh.head.map((h, i) => cell(h, i, true)).join('')}</w:tr>` +
+      sh.rows.map(r => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${sh.head.map((_, i) => cell(r[i] ?? '', i, false)).join('')}</w:tr>`).join('') + '</w:tbl>' + docxP('');
+  }
+  body += docxP(`${appName()} · ${roc(today())}`, { sz: 16 });
+  return docxPack(body, `<w:sectPr><w:pgSz w:w="${pw}" w:h="${ph}"${wide ? ' w:orient="landscape"' : ''}/><w:pgMar w:top="${mar}" w:right="${mar}" w:bottom="${mar}" w:left="${mar}" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>`);
+}
+function docxPack(body, sect) {
+  const W = 'http://schemas.openxmlformats.org/';
+  return zipStore([
+    { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="${W}package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>` },
+    { name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${W}package/2006/relationships"><Relationship Id="rId1" Type="${W}officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+    { name: 'word/document.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}wordprocessingml/2006/main"><w:body>${body}${sect}</w:body></w:document>` }
+  ], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+}
+
+/* ---------- 從 Excel 匯入物品 ---------- */
+const IMP_COLS = { name: ['品名', '名稱', '商品名稱', '物品'], dept: ['部門'], cat: ['分類', '類別'], unit: ['單位'], sp: ['售價', '定價', '價格'], loc: ['存放位置', '位置'], safe: ['安全存量'], barcode: ['條碼', 'barcode'], note: ['備註'] };
+async function importItems(file) {
+  let aoa;
+  try {
+    await loadLib('xlsx');
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true });
+  } catch (e) { toast(e.message && e.message.includes('網路') ? e.message : '無法讀取這個檔案', 4000); return; }
+  const hi = aoa.findIndex(r => r.some(v => IMP_COLS.name.includes(String(v).trim())));
+  if (hi < 0) { toast('找不到「品名」欄 (第一列要有欄名)', 4000); return; }
+  const hd = aoa[hi].map(v => String(v).trim().toLowerCase()), col = {};
+  for (const [k, names] of Object.entries(IMP_COLS)) { const i = hd.findIndex(h => names.some(n => n.toLowerCase() === h)); if (i >= 0) col[k] = i; }
+  const add = [], upd = [], seen = new Set();
+  for (const r of aoa.slice(hi + 1)) {
+    const g = k => col[k] == null ? '' : String(r[col[k]] ?? '').trim();
+    const name = g('name'); if (!name) continue;
+    const bar = g('barcode'), v = { name };
+    const dept = g('dept'); if (dept) v.dept = DEPTS.includes(dept) ? dept : '其他';
+    for (const k of ['cat', 'unit', 'loc', 'note']) if (g(k)) v[k] = g(k);
+    for (const k of ['sp', 'safe']) { const s = g(k).replace(/[,$\s]/g, ''); if (s !== '' && !isNaN(+s)) v[k] = +s; }
+    if (bar) v.barcode = bar;
+    const it = (bar && S.items.find(x => x.barcode === bar)) || S.items.find(x => x.name === name);
+    const key = it ? 'id' + it.id : 'n' + (bar || name); if (seen.has(key)) continue; seen.add(key);
+    if (it) upd.push(Object.assign({ ...it }, v));
+    else add.push(Object.assign({ name: '', dept: '其他', cat: '', unit: '個', barcode: '', sp: 0, loc: '', safe: 0, noStock: false, note: '' }, v));
+  }
+  if (!add.length && !upd.length) { toast('沒有可匯入的資料'); return; }
+  if (!confirm(`匯入物品：新增 ${add.length} 項、更新 ${upd.length} 項？${Cloud.on ? '\n會同步給家人。' : ''}\n(庫存數量不會匯入，請用購入記錄)`)) return;
+  for (const rec of upd) { await DB.put('items', rec); S.items[S.items.findIndex(x => x.id === rec.id)] = rec; }
+  for (const rec of add) { await DB.put('items', rec); S.items.push(rec); }
+  toast(`已匯入：新增 ${add.length} 項、更新 ${upd.length} 項`); render();
+}
+const impTemplate = () => exportRpt({ title: '物品匯入範本', file: '物品匯入範本', info: ['第一列以下照欄名填寫，品名必填；部門：' + DEPTS.join('、')],
+  sheets: [{ name: '物品', head: ['品名', '部門', '分類', '單位', '售價', '存放位置', '安全存量', '條碼', '備註'], rows: [['衛生紙 (範例)', '住', '清潔', '串', '', '儲藏室', 2, '', '範例，可刪除']] }] }, 'xlsx');
+
+/* ---------- 附件 / 文件 : files { id, own: 'item:id' | 'note:id' | 'doc', name, type, size, at, data: ArrayBuffer } ---------- */
+const FMAX = 25 * 1024 * 1024;
+async function filesOf(own) {
+  await DB.open();
+  return new Promise((ok, bad) => { const r = DB.db.transaction('files').objectStore('files').index('own').getAll(own); r.onsuccess = () => ok(r.result.sort((a, b) => a.at - b.at)); r.onerror = () => bad(r.error); });
+}
+const fileGet = async id => { await DB.open(); return new Promise((ok, bad) => { const r = DB.db.transaction('files').objectStore('files').get(id); r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); }); };
+const filePut = rec => DB._put('files', rec);
+const fileDel = id => DB._del('files', id);
+async function filesDelOwn(own) { for (const f of await filesOf(own)) await fileDel(f.id); }
+const fExt = n => (String(n).split('.').pop() || '').toLowerCase();
+const fIcon = f => /^image\//.test(f.type) ? '🖼' : fExt(f.name) === 'pdf' ? '📕' : /^(docx?|odt|rtf|txt)$/.test(fExt(f.name)) ? '📝' : /^(xlsx?|ods|csv)$/.test(fExt(f.name)) ? '📊' : '📎';
+const fSize = n => n < 1024 ? n + ' B' : n < 1048576 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+const fBlob = f => new Blob([f.data], { type: f.type || 'application/octet-stream' });
+const MIME = { txt: 'text/plain', csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+function attachHtml(title, hint) {
+  return `<div class="card att"><h2>${title} <span class="small muted" style="font-weight:400">(只存在這台)</span></h2><ul class="list att-list"><li class="empty muted small">讀取中…</li></ul>
+    <div class="btnrow" style="margin-top:6px"><button class="btn ghost att-add" type="button">＋ ${hint}</button></div><input type="file" class="att-file" multiple hidden></div>`;
+}
+async function attachInit(root, own, back) {
+  if (!root) return;
+  const list = root.querySelector('.att-list');
+  const draw = async () => {
+    const fs = await filesOf(own);
+    if (!list.isConnected) return;
+    list.innerHTML = fs.map(f => `<li class="tap" data-id="${f.id}"><span style="font-size:22px">${fIcon(f)}</span><div class="grow" style="min-width:0"><div style="word-break:break-all">${esc(f.name)}</div><div class="small muted">${fSize(f.size)} · ${roc(new Date(f.at - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}</div></div><button class="iconbtn" type="button" data-del="${f.id}" aria-label="刪除" style="width:36px">✕</button></li>`).join('') || '<li class="empty muted small">沒有檔案</li>';
+  };
+  await draw();
+  root.querySelector('.att-add').onclick = () => root.querySelector('.att-file').click();
+  root.querySelector('.att-file').onchange = async e => {
+    const fl = [...e.target.files]; e.target.value = '';
+    for (const f of fl) {
+      if (f.size > FMAX) { toast(`「${f.name}」超過 25MB，不能加入`, 3500); continue; }
+      await filePut({ id: newId(), own, name: f.name, type: f.type || MIME[fExt(f.name)] || '', size: f.size, at: Date.now(), data: await f.arrayBuffer() });
+    }
+    if (fl.length) { toast('已加入'); await draw(); }
+  };
+  list.onclick = async e => {
+    const d = e.target.closest('[data-del]');
+    if (d) { const f = await fileGet(Number(d.dataset.del)); if (f && confirm(`刪除「${f.name}」？`)) { await fileDel(f.id); await draw(); } return; }
+    const li = e.target.closest('li[data-id]'); if (!li) return;
+    const f = await fileGet(Number(li.dataset.id)); if (f) filePreview(f, back);
+  };
+}
+const canEdit = f => ['txt', 'csv', 'xlsx', 'xls', 'ods'].includes(fExt(f.name)) || /^text\/plain/.test(f.type);
+async function filePreview(f, back) {
+  openSheet(`<h3 style="word-break:break-all">${fIcon(f)} ${esc(f.name)}</h3>
+    <div class="btnrow" style="margin-bottom:10px"><button class="btn ghost" id="fp-back" type="button">‹ 返回</button>${canEdit(f) ? '<button class="btn" id="fp-edit" type="button">編輯</button>' : ''}<button class="btn ghost" id="fp-open" type="button">${isIOS ? '分享 / 用其他 App 開啟' : '下載'}</button></div>
+    <div id="fp-body" class="fpv"><p class="muted small">載入中…</p></div>`);
+  $('#fp-back').onclick = back;
+  $('#fp-open').onclick = () => saveBlobs([{ name: f.name, blob: fBlob(f) }]);
+  if ($('#fp-edit')) $('#fp-edit').onclick = () => (/^(xlsx?|ods|csv)$/.test(fExt(f.name)) ? sheetEdit : textEdit)(f, f.own, () => filePreview(f, back));
+  const box = $('#fp-body'), ext = fExt(f.name);
+  try {
+    if (/^image\//.test(f.type)) box.innerHTML = `<img src="${URL.createObjectURL(fBlob(f))}" alt="" style="max-width:100%;border-radius:8px">`;
+    else if (ext === 'pdf' || f.type === 'application/pdf') await pdfView(f.data, box);
+    else if (ext === 'docx') { await loadLib('mammoth'); const r = await mammoth.convertToHtml({ arrayBuffer: f.data.slice(0) }); box.innerHTML = `<div class="docv">${r.value || '<p class="muted">(空白文件)</p>'}</div>`; }
+    else if (/^(xlsx?|ods|csv)$/.test(ext)) { await loadLib('xlsx'); const wb = XLSX.read(f.data, { type: 'array' }); box.innerHTML = wb.SheetNames.map(n => `<h2 class="small muted">${esc(n)}</h2><div class="xlv">${XLSX.utils.sheet_to_html(wb.Sheets[n], { header: '', footer: '' })}</div>`).join(''); }
+    else if (ext === 'txt' || /^text\//.test(f.type)) box.innerHTML = `<pre class="txv">${esc(new TextDecoder().decode(f.data).replace(/^﻿/, ''))}</pre>`;
+    else box.innerHTML = '<p class="muted">這種檔案不能在 APP 裡預覽 (例如舊版 .doc)，請按上面的按鈕用其他 App 開啟。</p>';
+  } catch (e) { if (box.isConnected) box.innerHTML = `<p class="muted">無法預覽：${esc(e.message || e)}</p>`; }
+}
+async function pdfView(buf, box) {
+  await loadLib('pdf');
+  if (!pdfView.w) { const t = await (await fetch(PDF_WORKER)).text(); pdfjsLib.GlobalWorkerOptions.workerSrc = pdfView.w = URL.createObjectURL(new Blob([t], { type: 'text/javascript' })); }
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf.slice(0)), cMapUrl: PDF_CMAP, cMapPacked: true }).promise;
+  if (!box.isConnected) return;
+  box.innerHTML = `<p class="small muted">共 ${pdf.numPages} 頁</p>`;
+  const W = Math.min(box.clientWidth || 360, 1000), dpr = Math.min(window.devicePixelRatio || 1, 2), N = Math.min(pdf.numPages, 50);
+  for (let i = 1; i <= N; i++) {
+    const pg = await pdf.getPage(i), vp = pg.getViewport({ scale: W / pg.getViewport({ scale: 1 }).width * dpr });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.className = 'pdfpg';
+    if (!box.isConnected) return; box.appendChild(c);
+    await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+  }
+  if (pdf.numPages > N) box.insertAdjacentHTML('beforeend', '<p class="small muted">只顯示前 50 頁，其餘請用其他 App 開啟。</p>');
+}
+
+/* ---------- 文字檔編輯 ---------- */
+function textEdit(f, own, back) {
+  const name = f ? f.name : `記事_${stamp()}.txt`, txt = f ? new TextDecoder().decode(f.data).replace(/^﻿/, '') : '';
+  openSheet(`<h3>${f ? '編輯文字檔' : '新文字檔'}</h3>
+    <label>檔名</label><input id="te-name" data-ime="zh" value="${esc(name)}">
+    <label>內容</label><textarea id="te-text" data-ime="zh" style="min-height:45vh;font-family:inherit">${esc(txt)}</textarea>
+    <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="te-x" type="button">取消</button><button class="btn ghost" id="te-dl" type="button">下載</button><button class="btn" id="te-ok" type="button">儲存</button></div>`);
+  const rec = () => { let n = $('#te-name').value.trim() || name; if (!/\.[a-z0-9]{1,5}$/i.test(n)) n += '.txt';
+    const data = new TextEncoder().encode($('#te-text').value).buffer;
+    return Object.assign(f ? { ...f } : { id: newId(), own }, { name: n, type: 'text/plain', size: data.byteLength, at: Date.now(), data }); };
+  $('#te-x').onclick = back;
+  $('#te-dl').onclick = () => { const r = rec(); saveBlobs([{ name: r.name, blob: fBlob(r) }]); };
+  $('#te-ok').onclick = async () => { const r = rec(); await filePut(r); Object.assign(f || {}, r); toast('已儲存'); back(); };
+}
+
+/* ---------- 表格編輯 (簡易試算表 : 數字、文字、公式 =SUM(A1:A5) =A1*B1 ; 存成 .xlsx 或 .csv) ---------- */
+const colName = c => { let s = ''; c++; while (c) { s = String.fromCharCode(65 + (c - 1) % 26) + s; c = Math.floor((c - 1) / 26); } return s; };
+function sheetCalc(g) {
+  const memo = {}, busy = new Set();
+  const ref = s => { const m = /^([A-Z]+)(\d+)$/.exec(s); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return [Number(m[2]) - 1, c - 1]; };
+  const val = (r, c) => {
+    const k = r + ',' + c; if (k in memo) return memo[k];
+    const raw = String((g[r] || [])[c] ?? '').trim();
+    if (!raw.startsWith('=')) { const n = Number(raw.replace(/,/g, '')); return memo[k] = raw !== '' && !isNaN(n) ? n : raw; }
+    if (busy.has(k)) return '#循環'; busy.add(k);
+    let v; try { v = evalF(raw.slice(1)); if (v === '') v = 0; if (typeof v === 'number' && !isFinite(v)) v = '#錯誤'; } catch (e) { v = typeof e === 'string' ? e : '#錯誤'; }
+    busy.delete(k); return memo[k] = v;
+  };
+  const num = x => typeof x === 'number' ? x : x === '' ? 0 : (() => { throw 0; })();
+  const FN = { SUM: a => a.reduce((s, x) => s + x, 0), AVERAGE: a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0, MIN: a => a.length ? Math.min(...a) : 0, MAX: a => a.length ? Math.max(...a) : 0, COUNT: a => a.length, ROUND: (a, raw) => { const p = 10 ** (raw[1] || 0); return Math.round(raw[0] * p) / p; } };
+  function evalF(src) {
+    const tk = src.toUpperCase().match(/[A-Z]+\d+:[A-Z]+\d+|[A-Z]+\d+|[A-Z]+(?=\()|\d+(?:\.\d+)?|[-+*/(),]|\S/g) || []; let p = 0;
+    const peek = () => tk[p], eat = t => { if (tk[p] !== t) throw 0; p++; };
+    const expr = () => { let v = term(); while (peek() === '+' || peek() === '-') { const o = tk[p++], b = num(term()); v = o === '+' ? num(v) + b : num(v) - b; } return v; };
+    const term = () => { let v = fac(); while (peek() === '*' || peek() === '/') { const o = tk[p++], b = num(fac()); v = o === '*' ? num(v) * b : num(v) / b; } return v; };
+    const fac = () => {
+      const t = tk[p++];
+      if (t === '-') return -num(fac());
+      if (t === '+') return num(fac());
+      if (t === '(') { const v = expr(); eat(')'); return v; }
+      if (/^\d/.test(t)) return Number(t);
+      if (/^[A-Z]+\d+:[A-Z]+\d+$/.test(t)) throw 0;
+      if (/^[A-Z]+\d+$/.test(t)) { const [r, c] = ref(t), v = val(r, c); if (typeof v === 'string' && v.startsWith('#')) throw v; return v; }
+      if (FN[t]) {
+        eat('('); const all = [], raw = [];
+        if (peek() !== ')') for (;;) {
+          if (/^[A-Z]+\d+:[A-Z]+\d+$/.test(peek() || '')) { const [a, b] = tk[p++].split(':'), [r1, c1] = ref(a), [r2, c2] = ref(b);
+            for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) { const v = val(r, c); if (typeof v === 'number') all.push(v); } }
+          else { const v = expr(); raw.push(num(v)); if (typeof v === 'number') all.push(v); }
+          if (peek() === ',') { p++; continue; } break;
+        }
+        eat(')'); return FN[t](all, raw);
+      }
+      throw 0;
+    };
+    const v = expr(); if (p < tk.length) throw 0; return v;
+  }
+  return { val };
+}
+async function sheetEdit(f, own, back) {
+  try { await loadLib('xlsx'); } catch (e) { toast(e.message, 4000); return; }
+  let g = [], name = f ? f.name : `表格_${stamp()}.xlsx`;
+  if (f) {
+    try {
+      const wb = XLSX.read(f.data, { type: 'array', cellFormula: true }), ws = wb.Sheets[wb.SheetNames[0]];
+      const rg = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let r = 0; r <= rg.e.r; r++) { g[r] = []; for (let c = 0; c <= rg.e.c; c++) { const x = ws[XLSX.utils.encode_cell({ r, c })]; g[r][c] = !x ? '' : x.f ? '=' + x.f : x.v instanceof Date ? roc(x.v.toISOString().slice(0, 10)) : String(x.v ?? ''); } }
+      if (wb.SheetNames.length > 1) toast('只編輯第一個工作表，其他工作表儲存後會保留', 3500);
+    } catch (e) { toast('無法讀取這個表格', 3500); return; }
+  }
+  let R = Math.max(g.length + 3, 12), C = Math.max(...g.map(r => r.length), 0) + 1; C = Math.max(C, 5);
+  const norm = () => { for (let r = 0; r < R; r++) { g[r] = g[r] || []; for (let c = 0; c < C; c++) g[r][c] = g[r][c] ?? ''; } };
+  norm();
+  openSheet(`<h3>${f ? '編輯表格' : '新表格'}</h3>
+    <label>檔名</label><input id="se-name" data-ime="zh" value="${esc(name)}">
+    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow">公式範例：=SUM(B2:B10)、=B2*C2、=AVERAGE(B2:B10)</span></div>
+    <div class="btnrow" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button></div>
+    <div class="gridwrap"><table class="grid" id="se-grid"></table></div>
+    <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="se-x" type="button">取消</button><button class="btn ghost" id="se-dl" type="button">下載</button><button class="btn" id="se-ok" type="button">儲存</button></div>`);
+  let calc = sheetCalc(g);
+  const show = (r, c) => { const v = calc.val(r, c); return typeof v === 'number' ? String(Math.round(v * 1e6) / 1e6) : v; };
+  const draw = () => {
+    calc = sheetCalc(g);
+    $('#se-grid').innerHTML = `<thead><tr><th class="rh"></th>${Array.from({ length: C }, (_, c) => `<th>${colName(c)}</th>`).join('')}</tr></thead><tbody>` +
+      g.slice(0, R).map((row, r) => `<tr><th class="rh">${r + 1}</th>${row.slice(0, C).map((x, c) => { const v = calc.val(r, c); return `<td><input data-r="${r}" data-c="${c}" class="${typeof v === 'number' ? 'num' : ''}${String(x).startsWith('=') ? ' fx' : ''}" value="${esc(show(r, c))}"></td>`; }).join('')}</tr>`).join('') + '</tbody>';
+  };
+  draw();
+  const grid = $('#se-grid');
+  grid.addEventListener('focusin', e => { const i = e.target.closest('input'); if (i) i.value = g[i.dataset.r][i.dataset.c]; });
+  grid.addEventListener('input', e => { const i = e.target.closest('input'); if (i) g[i.dataset.r][i.dataset.c] = i.value; });
+  grid.addEventListener('focusout', e => {
+    const i = e.target.closest('input'); if (!i) return;
+    calc = sheetCalc(g);
+    for (const x of grid.querySelectorAll('input')) if (x !== document.activeElement || x === i) { const v = calc.val(+x.dataset.r, +x.dataset.c); x.value = show(+x.dataset.r, +x.dataset.c); x.classList.toggle('num', typeof v === 'number'); x.classList.toggle('fx', String(g[x.dataset.r][x.dataset.c]).startsWith('=')); }
+  });
+  grid.addEventListener('keydown', e => {   // Enter 往下一格
+    const i = e.target.closest('input'); if (!i || e.key !== 'Enter') return; e.preventDefault();
+    const n = grid.querySelector(`input[data-r="${+i.dataset.r + 1}"][data-c="${i.dataset.c}"]`); if (n) n.focus(); else i.blur();
+  });
+  $('#se-ar').onclick = () => { R++; norm(); draw(); };
+  $('#se-ac').onclick = () => { if (C >= 52) return; C++; norm(); draw(); };
+  $('#se-dr').onclick = () => { if (R <= 1) return; if (g[R - 1].some(x => x !== '') && !confirm(`第 ${R} 列有資料，確定刪除？`)) return; R--; g.length = R; draw(); };
+  $('#se-dc').onclick = () => { if (C <= 1) return; if (g.some(r => r[C - 1] !== '') && !confirm(`${colName(C - 1)} 欄有資料，確定刪除？`)) return; C--; g.forEach(r => r.length = C); draw(); };
+  const build = () => {
+    calc = sheetCalc(g);
+    let n = $('#se-name').value.trim() || name; if (!/\.(xlsx|csv|xls|ods)$/i.test(n)) n = n.replace(/\.[a-z0-9]{1,5}$/i, '') + '.xlsx';
+    let lr = -1, lc = -1; g.forEach((row, r) => row.forEach((x, c) => { if (String(x).trim() !== '') { lr = Math.max(lr, r); lc = Math.max(lc, c); } }));
+    const aoa = []; for (let r = 0; r <= lr; r++) { aoa[r] = []; for (let c = 0; c <= lc; c++) aoa[r][c] = calc.val(r, c); }
+    let data, type;
+    if (fExt(n) === 'csv') { data = new TextEncoder().encode(csv(aoa)).buffer; type = MIME.csv; }
+    else {
+      const ws = XLSX.utils.aoa_to_sheet(aoa.length ? aoa : [['']]);
+      for (let r = 0; r <= lr; r++) for (let c = 0; c <= lc; c++) { const x = String(g[r][c]); if (x.startsWith('=')) { const a = XLSX.utils.encode_cell({ r, c }); ws[a] = Object.assign(ws[a] || { t: 'n' }, { f: x.slice(1) }); } }
+      let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      if (f && /^(xlsx?|ods)$/.test(fExt(f.name))) { try { const old = XLSX.read(f.data, { type: 'array', cellFormula: true }); old.Sheets[old.SheetNames[0]] = ws; wb = old; } catch (e) { } }   // 保留其他工作表
+      if (fExt(n) !== 'xlsx') n = n.replace(/\.[a-z]+$/i, '.xlsx');
+      data = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }); type = MIME.xlsx;
+    }
+    return Object.assign(f ? { ...f } : { id: newId(), own }, { name: n, type, size: data.byteLength, at: Date.now(), data });
+  };
+  $('#se-x').onclick = back;
+  $('#se-dl').onclick = () => { document.activeElement && document.activeElement.blur(); const r = build(); saveBlobs([{ name: r.name, blob: fBlob(r) }]); };
+  $('#se-ok').onclick = async () => { document.activeElement && document.activeElement.blur(); const r = build(); await filePut(r); Object.assign(f || {}, r); toast('已儲存'); back(); };
+}
+
+/* ---------- 設定頁 : 匯出報表 / 匯入物品 / 文件 ---------- */
+function renderDocs() {
+  expFmtUI();
+  const box = $('#docBox'); if (!box) return;
+  box.innerHTML = attachHtml('文件', '開啟檔案');
+  box.querySelector('.att-add').insertAdjacentHTML('beforebegin', '<button class="btn" id="btnDocTxt" type="button">＋ 新文字檔</button><button class="btn" id="btnDocSheet" type="button">＋ 新表格</button>');
+  box.querySelector('.att').insertAdjacentHTML('beforeend', '<p class="small muted" style="margin:8px 0 0">文字檔、表格、PDF、Word、Excel、照片都可以放這裡，在 APP 裡預覽；文字檔和表格可以直接編輯。文件和附件只存在這台手機，不會同步給家人，也不包含在「備份匯出」裡，重要的請下載保存。</p>');
+  attachInit(box.querySelector('.att'), 'doc', () => { closeSheet(); renderDocs(); });
+  $('#btnDocTxt').onclick = () => textEdit(null, 'doc', () => { closeSheet(); renderDocs(); });
+  $('#btnDocSheet').onclick = () => sheetEdit(null, 'doc', () => { closeSheet(); renderDocs(); });
+}
+$('#btnImpItems').onclick = () => $('#fileImpItems').click();
+$('#fileImpItems').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importItems(f); };
+$('#btnImpTpl').onclick = impTemplate;
 </script>
 <script>
 // 萬年行事曆 (首頁頂部) : 西元年顯示 , 記事存 localStorage cal_note_YYYYMMDD
@@ -3071,8 +3515,10 @@ function noteForm(id, iso) {
     <label>重複</label><div class="chips" id="n-rep" style="flex-wrap:wrap">${Object.entries(NREP).map(([k, v]) => `<button class="chip ${n.rep === k ? 'on' : ''}" data-v="${k}">${v}</button>`).join('')}</div>
     <div class="small muted" id="n-rephint"></div>
     <label class="row" style="color:var(--ink);margin-top:12px"><input id="n-todo" type="checkbox" style="width:22px;min-height:22px" ${n.todo ? 'checked' : ''}> 待辦 (可打勾完成${n.rep ? '，每一期各自打勾' : ''})</label>
+    ${id ? attachHtml('附件', '附加檔案') : '<p class="small muted">儲存後再打開這則記事，可以加附件 (PDF、Word、Excel、照片)。</p>'}
     <div class="btnrow" style="margin-top:14px">${id ? '<button class="btn danger" id="n-del">刪除</button>' : ''}<button class="btn ghost" id="n-x">取消</button><button class="btn" id="n-ok">儲存</button></div>`);
   let cat = n.cat, rep = n.rep || '';
+  if (id) attachInit($('#sheet .att'), 'note:' + id, () => noteForm(id, iso));
   const hint = () => {
     const dt = $('#n-date').value; if (!dt) { $('#n-rephint').textContent = ''; return; }
     const d = isoDate(dt), ld = lunarDate(d);
@@ -3099,7 +3545,7 @@ function noteForm(id, iso) {
   };
   if (id) $('#n-del').onclick = async () => {
     if (!confirm(n.rep ? `刪除這則${NREP[n.rep]}記事？(每一期都會刪除)` : '刪除這則記事？')) return;
-    await DB.del('notes', id); S.notes = S.notes.filter(x => x.id !== id);
+    await DB.del('notes', id); S.notes = S.notes.filter(x => x.id !== id); filesDelOwn('note:' + id);
     closeSheet(); toast('已刪除'); renderCalendar(); showNote();
   };
 }
