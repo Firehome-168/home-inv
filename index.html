@@ -215,6 +215,9 @@ th{color:var(--muted);font-weight:600;text-align:left}
 table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
 .grid th{position:sticky;top:0;z-index:2;background:var(--brand-soft);color:var(--muted);font-weight:600;text-align:center;padding:2px 6px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);min-width:32px}
 .grid th.rh{left:0;z-index:1}
+.grid thead th[data-col]{cursor:pointer}
+.btnrow.setb{display:grid;grid-template-columns:repeat(3,1fr)}
+.setb .btn{padding:8px 4px;font-size:15px;white-space:nowrap}
 .grid thead th.rh{z-index:3}
 .grid td{padding:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
 .grid td input{width:104px;min-height:34px;border:0;border-radius:0;padding:4px 6px;font-size:15px;background:transparent}
@@ -438,7 +441,7 @@ table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.5</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.5.2</p>
   </section>
 </main>
 
@@ -3069,13 +3072,36 @@ function textEdit(f, own, back) {
 }
 
 /* ---------- 表格編輯 (簡易試算表 : 數字、文字、公式 =SUM(A1:A5) =A1*B1 ; 存成 .xlsx 或 .csv) ---------- */
+// 沒打 = 的算式也自動計算 : 5*168、100+20、A1*B1、3x5 (只有 - 的不算 , 避免電話 02-1234 被當減法)
+function autoF(raw) {
+  let t = String(raw ?? '').trim(); if (!t || t.startsWith('=')) return '';
+  t = t.replace(/×/g, '*').replace(/÷/g, '/').replace(/(\d)\s*[xX]\s*(?=\d)/g, '$1*').replace(/,/g, '');
+  const z = t.replace(/[A-Za-z]{1,2}\d+/g, '0');
+  return /^[\s\d.()+\-*/]+$/.test(z) && /[*/+]/.test(z) && /\d/.test(z) && !/[*/+]\s*$/.test(z) ? t.toUpperCase() : '';
+}
+const isFx = x => String(x ?? '').trim().startsWith('=') || !!autoF(x);
 const colName = c => { let s = ''; c++; while (c) { s = String.fromCharCode(65 + (c - 1) % 26) + s; c = Math.floor((c - 1) / 26); } return s; };
 function sheetCalc(g) {
   const memo = {}, busy = new Set();
+  // 欄名運算 : 第 1 列當欄名 , 「數量*定價」= 同一列的 數量欄 * 定價欄 (存 xlsx 時換成 D2*C2)
+  const hdr = (g[0] || []).map((x, i) => [String(x ?? '').trim(), i])
+    .filter(([n]) => n && n.length <= 20 && !n.startsWith('=') && isNaN(Number(n.replace(/,/g, ''))) && !/[+\-*/()=,\s]/.test(n))
+    .sort((a, b) => b[0].length - a[0].length);
+  const reEsc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const sub = (t, r) => {
+    if (!r || !hdr.length || !t) return t;
+    for (const [n, i] of hdr) if (t.includes(n)) t = t.replace(new RegExp('(^|[^A-Za-z0-9_])' + reEsc(n) + '(?![A-Za-z0-9_])', 'g'), '$1' + colName(i) + (r + 1));
+    return t;
+  };
+  const form = (r, c) => {   // 公式 (不含 =) ; 不是公式回傳 ''
+    const t = sub(String((g[r] || [])[c] ?? '').trim(), r);
+    return t.startsWith('=') ? t.slice(1).trim() : autoF(t);
+  };
+  const named = x => { const l = hdr.filter(([n]) => String(x).includes(n)).map(([, i]) => i); return l.length ? l : null; };
   const ref = s => { const m = /^([A-Z]+)(\d+)$/.exec(s); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return [Number(m[2]) - 1, c - 1]; };
   const val = (r, c) => {
     const k = r + ',' + c; if (k in memo) return memo[k];
-    const raw = String((g[r] || [])[c] ?? '').trim();
+    const fm = form(r, c), raw = fm ? '=' + fm : String((g[r] || [])[c] ?? '').trim();
     if (!raw.startsWith('=')) { const n = Number(raw.replace(/,/g, '')); return memo[k] = raw !== '' && !isNaN(n) ? n : raw; }
     if (busy.has(k)) return '#循環'; busy.add(k);
     let v; try { v = evalF(raw.slice(1)); if (v === '') v = 0; if (typeof v === 'number' && !isFinite(v)) v = '#錯誤'; } catch (e) { v = typeof e === 'string' ? e : '#錯誤'; }
@@ -3110,16 +3136,18 @@ function sheetCalc(g) {
     };
     const v = expr(); if (p < tk.length) throw 0; return v;
   }
-  return { val };
+  return { val, form, named };
 }
 async function sheetEdit(f, own, back) {
   try { await loadLib('xlsx'); } catch (e) { toast(e.message, 4000); return; }
-  let g = [], name = f ? f.name : `表格_${stamp()}.xlsx`;
+  let g = [], name = f ? f.name : `表格_${stamp()}.xlsx`, sel = null;
+  const cw = [], CW0 = 10, colPx = c => Math.round((cw[c] || CW0) * 8.5 + 18);   // 欄寬 : 字元數 (中文算 2)
   if (f) {
     try {
-      const wb = XLSX.read(f.data, { type: 'array', cellFormula: true }), ws = wb.Sheets[wb.SheetNames[0]];
+      const wb = XLSX.read(f.data, { type: 'array', cellFormula: true, cellStyles: true }), ws = wb.Sheets[wb.SheetNames[0]];
       const rg = XLSX.utils.decode_range(ws['!ref'] || 'A1');
       for (let r = 0; r <= rg.e.r; r++) { g[r] = []; for (let c = 0; c <= rg.e.c; c++) { const x = ws[XLSX.utils.encode_cell({ r, c })]; g[r][c] = !x ? '' : x.f ? '=' + x.f : x.v instanceof Date ? roc(x.v.toISOString().slice(0, 10)) : String(x.v ?? ''); } }
+      (ws['!cols'] || []).forEach((x, c) => { if (x && (x.wch || x.width)) cw[c] = Math.round(x.wch || x.width); });
       if (wb.SheetNames.length > 1) toast('只編輯第一個工作表，其他工作表儲存後會保留', 3500);
     } catch (e) { toast('無法讀取這個表格', 3500); return; }
   }
@@ -3128,31 +3156,65 @@ async function sheetEdit(f, own, back) {
   norm();
   openSheet(`<h3>${f ? '編輯表格' : '新表格'}</h3>
     <label>檔名</label><input id="se-name" data-ime="zh" value="${esc(name)}">
-    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow">公式範例：=SUM(B2:B10)、=B2*C2、=AVERAGE(B2:B10)</span></div>
-    <div class="btnrow" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button></div>
+    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow">第 1 列打欄名 (例 定價、數量、金額)，金額欄打 數量*定價 就會用同一列計算，下面有資料的列自動帶入。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬。</span></div>
+    <div class="btnrow setb" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button><button class="btn ghost" id="se-sum" type="button">Σ 合計</button><button class="btn ghost" id="se-fit" type="button">自動欄寬</button></div>
     <div class="gridwrap"><table class="grid" id="se-grid"></table></div>
     <div class="btnrow" style="margin-top:12px"><button class="btn ghost" id="se-x" type="button">取消</button><button class="btn ghost" id="se-dl" type="button">下載</button><button class="btn" id="se-ok" type="button">儲存</button></div>`);
   let calc = sheetCalc(g);
   const show = (r, c) => { const v = calc.val(r, c); return typeof v === 'number' ? String(Math.round(v * 1e6) / 1e6) : v; };
   const draw = () => {
     calc = sheetCalc(g);
-    $('#se-grid').innerHTML = `<thead><tr><th class="rh"></th>${Array.from({ length: C }, (_, c) => `<th>${colName(c)}</th>`).join('')}</tr></thead><tbody>` +
-      g.slice(0, R).map((row, r) => `<tr><th class="rh">${r + 1}</th>${row.slice(0, C).map((x, c) => { const v = calc.val(r, c); return `<td><input data-r="${r}" data-c="${c}" class="${typeof v === 'number' ? 'num' : ''}${String(x).startsWith('=') ? ' fx' : ''}" value="${esc(show(r, c))}"></td>`; }).join('')}</tr>`).join('') + '</tbody>';
+    $('#se-grid').innerHTML = `<thead><tr><th class="rh"></th>${Array.from({ length: C }, (_, c) => `<th data-col="${c}" title="點一下設定欄寬">${colName(c)}</th>`).join('')}</tr></thead><tbody>` +
+      g.slice(0, R).map((row, r) => `<tr><th class="rh">${r + 1}</th>${row.slice(0, C).map((x, c) => { const v = calc.val(r, c); return `<td><input data-r="${r}" data-c="${c}" class="${typeof v === 'number' ? 'num' : ''}${calc.form(r, c) ? ' fx' : ''}" style="width:${colPx(c)}px" value="${esc(show(r, c))}"></td>`; }).join('')}</tr>`).join('') + '</tbody>';
   };
   draw();
   const grid = $('#se-grid');
-  grid.addEventListener('focusin', e => { const i = e.target.closest('input'); if (i) i.value = g[i.dataset.r][i.dataset.c]; });
+  grid.addEventListener('focusin', e => { const i = e.target.closest('input'); if (i) { sel = { r: +i.dataset.r, c: +i.dataset.c }; i.value = g[i.dataset.r][i.dataset.c]; } });
+  grid.addEventListener('click', e => {   // 點欄名設定欄寬
+    const h = e.target.closest('th[data-col]'); if (!h) return; const c = +h.dataset.col;
+    const v = prompt(`${colName(c)} 欄寬 (字數，中文一字算 2；目前 ${cw[c] || CW0})`, cw[c] || CW0); if (v === null) return;
+    const n = Math.round(Number(v)); if (!(n >= 2 && n <= 80)) { toast('欄寬請輸入 2 ~ 80'); return; }
+    cw[c] = n; draw();
+  });
   grid.addEventListener('input', e => { const i = e.target.closest('input'); if (i) g[i.dataset.r][i.dataset.c] = i.value; });
+  // 欄名公式 (例 金額欄打 數量*定價) : 同一欄下面空著、且該列被引用的欄有資料 -> 自動帶入同一算式
+  const fillDown = () => {
+    calc = sheetCalc(g);
+    for (let c = 0; c < C; c++) {
+      let tpl = '', cols = null;
+      for (let r = 1; r < R; r++) {
+        const x = String(g[r][c] ?? '').trim();
+        if (!tpl) { if (x && calc.form(r, c) && (cols = calc.named(x))) tpl = x; continue; }
+        if (x === '' && cols.some(ci => ci !== c && String(g[r][ci] ?? '').trim() !== '')) g[r][c] = tpl;
+      }
+    }
+    calc = sheetCalc(g);
+  };
   grid.addEventListener('focusout', e => {
     const i = e.target.closest('input'); if (!i) return;
-    calc = sheetCalc(g);
-    for (const x of grid.querySelectorAll('input')) if (x !== document.activeElement || x === i) { const v = calc.val(+x.dataset.r, +x.dataset.c); x.value = show(+x.dataset.r, +x.dataset.c); x.classList.toggle('num', typeof v === 'number'); x.classList.toggle('fx', String(g[x.dataset.r][x.dataset.c]).startsWith('=')); }
+    fillDown();
+    for (const x of grid.querySelectorAll('input')) if (x !== document.activeElement || x === i) { const v = calc.val(+x.dataset.r, +x.dataset.c); x.value = show(+x.dataset.r, +x.dataset.c); x.classList.toggle('num', typeof v === 'number'); x.classList.toggle('fx', !!calc.form(+x.dataset.r, +x.dataset.c)); }
   });
   grid.addEventListener('keydown', e => {   // Enter 往下一格
     const i = e.target.closest('input'); if (!i || e.key !== 'Enter') return; e.preventDefault();
     const n = grid.querySelector(`input[data-r="${+i.dataset.r + 1}"][data-c="${i.dataset.c}"]`); if (n) n.focus(); else i.blur();
   });
   $('#se-ar').onclick = () => { R++; norm(); draw(); };
+  $('#se-fit').onclick = () => {
+    calc = sheetCalc(g);
+    for (let c = 0; c < C; c++) { let w = 0; for (let r = 0; r < R; r++) w = Math.max(w, dispW(show(r, c))); cw[c] = w ? Math.min(40, Math.max(4, w + 1)) : CW0; }
+    draw(); toast('已依內容調整欄寬');
+  };
+  $('#se-sum').onclick = () => {   // 選定格子 : 加總上方連續的數字 (上方沒有就加總左方)
+    if (!sel) { toast('先點要放合計的格子'); return; }
+    calc = sheetCalc(g); const { r, c } = sel, num = (rr, cc) => typeof calc.val(rr, cc) === 'number';
+    let r0 = r; while (r0 > 0 && num(r0 - 1, c)) r0--;
+    let c0 = c; while (c0 > 0 && num(r, c0 - 1)) c0--;
+    if (r0 < r) g[r][c] = `=SUM(${colName(c)}${r0 + 1}:${colName(c)}${r})`;
+    else if (c0 < c) g[r][c] = `=SUM(${colName(c0)}${r + 1}:${colName(c - 1)}${r + 1})`;
+    else { toast('上方或左方沒有數字可以加總'); return; }
+    draw();
+  };
   $('#se-ac').onclick = () => { if (C >= 52) return; C++; norm(); draw(); };
   $('#se-dr').onclick = () => { if (R <= 1) return; if (g[R - 1].some(x => x !== '') && !confirm(`第 ${R} 列有資料，確定刪除？`)) return; R--; g.length = R; draw(); };
   $('#se-dc').onclick = () => { if (C <= 1) return; if (g.some(r => r[C - 1] !== '') && !confirm(`${colName(C - 1)} 欄有資料，確定刪除？`)) return; C--; g.forEach(r => r.length = C); draw(); };
@@ -3165,9 +3227,10 @@ async function sheetEdit(f, own, back) {
     if (fExt(n) === 'csv') { data = new TextEncoder().encode(csv(aoa)).buffer; type = MIME.csv; }
     else {
       const ws = XLSX.utils.aoa_to_sheet(aoa.length ? aoa : [['']]);
-      for (let r = 0; r <= lr; r++) for (let c = 0; c <= lc; c++) { const x = String(g[r][c]); if (x.startsWith('=')) { const a = XLSX.utils.encode_cell({ r, c }); ws[a] = Object.assign(ws[a] || { t: 'n' }, { f: x.slice(1) }); } }
+      for (let r = 0; r <= lr; r++) for (let c = 0; c <= lc; c++) { const fm = calc.form(r, c); if (fm) { const a = XLSX.utils.encode_cell({ r, c }); ws[a] = Object.assign(ws[a] || { t: 'n' }, { f: fm }); } }
+      ws['!cols'] = Array.from({ length: Math.max(lc + 1, 1) }, (_, c) => ({ wch: cw[c] || CW0 }));
       let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-      if (f && /^(xlsx?|ods)$/.test(fExt(f.name))) { try { const old = XLSX.read(f.data, { type: 'array', cellFormula: true }); old.Sheets[old.SheetNames[0]] = ws; wb = old; } catch (e) { } }   // 保留其他工作表
+      if (f && /^(xlsx?|ods)$/.test(fExt(f.name))) { try { const old = XLSX.read(f.data, { type: 'array', cellFormula: true, cellStyles: true }); old.Sheets[old.SheetNames[0]] = ws; wb = old; } catch (e) { } }   // 保留其他工作表
       if (fExt(n) !== 'xlsx') n = n.replace(/\.[a-z]+$/i, '.xlsx');
       data = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }); type = MIME.xlsx;
     }
