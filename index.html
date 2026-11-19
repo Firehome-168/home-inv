@@ -443,7 +443,7 @@ table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.6.6</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.6.7</p>
   </section>
 </main>
 
@@ -3099,10 +3099,10 @@ const colName = c => { let s = ''; c++; while (c) { s = String.fromCharCode(65 +
 function sheetCalc(g, hr = 1, isTx = () => false) {
   const memo = {}, busy = new Set();
   // 欄名運算 : 表頭 (第 1~hr 列) 的文字當欄名 , 「數量*定價」= 同一列的 數量欄 * 定價欄 (存 xlsx 時換成 D2*C2)
-  const nm = []; for (let r = 0; r < hr; r++) (g[r] || []).forEach((x, i) => { const n = String(x ?? '').trim(); if (n && !n.startsWith('=') && isNaN(Number(n.replace(/,/g, ''))) && !autoF(n)) nm.push([n, i]); });
+  const nm = []; for (let r = 0; r < hr; r++) (g[r] || []).forEach((x, i) => { const n = String(x ?? '').replace(/\s+/g, ''); if (n && !n.startsWith('=') && isNaN(Number(n.replace(/,/g, ''))) && !autoF(n)) nm.push([n, i]); });
   const hdr = nm.filter(([n]) => n.length <= 20 && !/[+\-*/()=,\s]/.test(n)).sort((a, b) => b[0].length - a[0].length);
   const reEsc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const colOf = n => { const e = nm.find(x => x[0] === n); return e ? e[1] : -1; };
+  const colOf = n => { n = String(n).replace(/\s+/g, ''); const e = nm.find(x => x[0] === n); return e ? e[1] : -1; };   // 欄名比對不管空格 (品　名 = 品名)
   const disc = new Set(nm.filter(([n]) => /折/.test(n)).map(([, i]) => i)), cref = (i, r) => disc.has(i) ? `DISC(${colName(i)}${r + 1})` : colName(i) + (r + 1);
   const sub = (t, r) => {
     if (r < hr || !t) return t;
@@ -3345,14 +3345,14 @@ async function sheetEdit(f, own, back) {
   // 代碼欄 (欄名有 代碼/條碼/貨號) : 打物品的條碼 -> 依表頭欄名帶入 品名、定價(售價)、單位、分類、部門、庫存 ; 有公式的格子不動
   const IMAP = [[/^(品名|名稱|商品|商品名稱|品項|物品)$/, it => it.name], [/^(定價|售價|單價)$/, it => it.sp || ''], [/^單位$/, it => it.unit || ''],
     [/^(分類|類別)$/, it => it.cat || ''], [/^部門$/, it => it.dept || ''], [/^(庫存|存量|庫存量)$/, it => it.noStock ? '' : stockOf(it.id)]];
-  const isCode = c => /代碼|條碼|貨號/.test(hn(c));
+  const hk = c => hn(c).replace(/\s+/g, ''), isCode = c => /代碼|條碼|貨號/.test(hk(c));
   const fillItem = (r, c) => {
     const code = String(g[r][c] ?? '').trim().normalize('NFKC'); if (!code) return;
     const it = S.items.find(x => x.barcode && String(x.barcode).trim() === code);
     if (!it) { toast(`找不到條碼 ${code} 的物品`, 2500); return; }
     calc = sheetCalc(g, HR, isTx); let n = 0;
     for (let cc = 0; cc < C; cc++) {
-      if (cc === c) continue; const m = IMAP.find(([re]) => re.test(hn(cc))); if (!m || calc.form(r, cc)) continue;
+      if (cc === c) continue; const m = IMAP.find(([re]) => re.test(hk(cc))); if (!m || calc.form(r, cc)) continue;
       const v = m[1](it); if (v === '' || v == null) continue; g[r][cc] = String(v); n++;
     }
     toast(n ? `已帶入 ${it.name}` : `${it.name}：表頭沒有 品名、定價、單位 這類欄位可帶入`, 2500);
