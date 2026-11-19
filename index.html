@@ -443,7 +443,7 @@ table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.6.4</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.6.6</p>
   </section>
 </main>
 
@@ -3079,12 +3079,21 @@ function autoF(raw) {
   let t = String(raw ?? '').trim(); if (!t || t.startsWith('=')) return '';
   t = t.replace(/×/g, '*').replace(/÷/g, '/').replace(/(\d)\s*[xX]\s*(?=\d)/g, '$1*').replace(/,/g, '');
   if (/^\d+\s*\/\s*\d+\s*\/\s*\d+$/.test(t)) return '';   // 115/11/21 是日期 , 不是除法 (要除請打 =)
-  const z = t.replace(/[A-Za-z]{1,2}\d+/g, '0');
+  const z = t.replace(/DISC\(/gi, '(').replace(/[A-Za-z]{1,2}\d+/g, '0');
   return /^[\s\d.()+\-*/]+$/.test(z) && /[*/+]/.test(z) && /\d/.test(z) && !/[*/+]\s*$/.test(z) ? t.toUpperCase() : '';
 }
 // 數字格式樣式 : 99,999.00 = 千分位 + 2 位小數 , 0.0 = 1 位小數 ; T = 文字
 const fmtPat = (v, p) => { const d = (p.split('.')[1] || '').length; return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: p.includes(',') }); };
 const xlNumFmt = p => p === 'T' ? '@' : (p.includes(',') ? '#,##0' : '0') + ((p.split('.')[1] || '').length ? '.' + '0'.repeat((p.split('.')[1] || '').length) : '');
+const discF = v => {
+  if (v === '' || v == null) return 1;
+  const t = String(v), n = typeof v === 'number' ? v : Number(t.replace(/[折%％\s,]/g, ''));
+  if (isNaN(n)) throw '#錯誤';
+  return /[%％]/.test(t) ? n / 100 : n <= 1 ? n : n < 10 ? n / 10 : n / 100;
+};
+// 存 Excel : DISC(E4) 換成 IF 公式 (Excel 照樣算) ; 讀回來再換回 DISC
+const xlF = f => f.replace(/DISC\(([A-Z]+\d+)\)/g, 'IF($1="",1,IF($1<=1,$1,IF($1<10,$1/10,$1/100)))');
+const unDisc = f => String(f).replace(/IF\(([A-Z]+\d+)="",1,IF\(\1<=1,\1,IF\(\1<10,\1\/10,\1\/100\)\)\)/g, 'DISC($1)');
 const isFx = x => String(x ?? '').trim().startsWith('=') || !!autoF(x);
 const colName = c => { let s = ''; c++; while (c) { s = String.fromCharCode(65 + (c - 1) % 26) + s; c = Math.floor((c - 1) / 26); } return s; };
 function sheetCalc(g, hr = 1, isTx = () => false) {
@@ -3094,11 +3103,12 @@ function sheetCalc(g, hr = 1, isTx = () => false) {
   const hdr = nm.filter(([n]) => n.length <= 20 && !/[+\-*/()=,\s]/.test(n)).sort((a, b) => b[0].length - a[0].length);
   const reEsc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const colOf = n => { const e = nm.find(x => x[0] === n); return e ? e[1] : -1; };
+  const disc = new Set(nm.filter(([n]) => /折/.test(n)).map(([, i]) => i)), cref = (i, r) => disc.has(i) ? `DISC(${colName(i)}${r + 1})` : colName(i) + (r + 1);
   const sub = (t, r) => {
     if (r < hr || !t) return t;
-    if (t.includes('[')) t = t.replace(/\[([^\]]+)\]/g, (m0, n) => { const i = colOf(n.trim()); return i >= 0 ? colName(i) + (r + 1) : m0; });
+    if (t.includes('[')) t = t.replace(/\[([^\]]+)\]/g, (m0, n) => { const i = colOf(n.trim()); return i >= 0 ? cref(i, r) : m0; });
     if (!hdr.length) return t;
-    for (const [n, i] of hdr) if (t.includes(n)) t = t.replace(new RegExp('(^|[^A-Za-z0-9_])' + reEsc(n) + '(?![A-Za-z0-9_])', 'g'), '$1' + colName(i) + (r + 1));
+    for (const [n, i] of hdr) if (t.includes(n)) t = t.replace(new RegExp('(^|[^A-Za-z0-9_])' + reEsc(n) + '(?![A-Za-z0-9_])', 'g'), (m0, a) => a + cref(i, r));
     return t;
   };
   const form = (r, c) => {   // 公式 (不含 =) ; 不是公式回傳 ''
@@ -3130,6 +3140,7 @@ function sheetCalc(g, hr = 1, isTx = () => false) {
       if (/^\d/.test(t)) return Number(t);
       if (/^[A-Z]+\d+:[A-Z]+\d+$/.test(t)) throw 0;
       if (/^[A-Z]+\d+$/.test(t)) { const [r, c] = ref(t), v = val(r, c); if (typeof v === 'string' && v.startsWith('#')) throw v; return v; }
+      if (t === 'DISC') { eat('('); const a = tk[p++]; eat(')'); if (!/^[A-Z]+\d+$/.test(a || '')) throw 0; const [r, c] = ref(a), v = val(r, c); if (typeof v === 'string' && v.startsWith('#')) throw v; return discF(v); }
       if (FN[t]) {
         eat('('); const all = [], raw = [];
         if (peek() !== ')') for (;;) {
@@ -3144,7 +3155,7 @@ function sheetCalc(g, hr = 1, isTx = () => false) {
     };
     const v = expr(); if (p < tk.length) throw 0; return v;
   }
-  return { val, form, named, colOf, names: () => [...new Set(nm.map(x => x[0]))] };
+  return { val, form, named, colOf, isDisc: c => disc.has(c), names: () => [...new Set(nm.map(x => x[0]))] };
 }
 // xlsx 加樣式 (SheetJS 免費版不寫樣式) : 表頭粗體 + 字體依行高倍數放大 , 各欄 靠左/置中/靠右 ; 在 styles.xml 後面附加 , 不動原有樣式
 function xlsxStyle(buf, hr, rh, al, nf = () => '') {
@@ -3248,7 +3259,7 @@ async function sheetEdit(f, own, back) {
     try {
       const wb = XLSX.read(f.data, { type: 'array', cellFormula: true, cellStyles: true }), ws = wb.Sheets[wb.SheetNames[0]];
       const rg = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      for (let r = 0; r <= rg.e.r; r++) { g[r] = []; for (let c = 0; c <= rg.e.c; c++) { const x = ws[XLSX.utils.encode_cell({ r, c })]; g[r][c] = !x ? '' : x.f ? '=' + x.f : x.v instanceof Date ? roc(x.v.toISOString().slice(0, 10)) : String(x.v ?? ''); } }
+      for (let r = 0; r <= rg.e.r; r++) { g[r] = []; for (let c = 0; c <= rg.e.c; c++) { const x = ws[XLSX.utils.encode_cell({ r, c })]; g[r][c] = !x ? '' : x.f ? '=' + unDisc(x.f) : x.v instanceof Date ? roc(x.v.toISOString().slice(0, 10)) : String(x.v ?? ''); } }
       (ws['!cols'] || []).forEach((x, c) => { if (x && (x.wch || x.width)) cw[c] = Math.round(x.wch || x.width); });
       let meta = null; try { meta = JSON.parse((wb.Custprops || {}).HomeInvSheet || 'null'); } catch (e) { }
       if (meta) { HR = meta.hr ?? 2; (meta.hh || []).forEach((x, i) => { if (x) hh[i] = x; }); (meta.al || []).forEach((x, i) => { if (x) al[i] = x; }); (meta.fm || []).forEach((x, i) => { if (x) fm[i] = x; }); chMeta = meta.ch || null; }
@@ -3265,7 +3276,7 @@ async function sheetEdit(f, own, back) {
   norm();
   openSheet(`<h3>${f ? '編輯表格' : '新表格'}</h3>
     <label>檔名</label><input id="se-name" data-ime="zh" value="${esc(name)}">
-    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow"><span id="se-hrtip">${hrTip()}</span>表頭打欄名 (例 定價、數量、金額)，任一格打 金額=數量*定價 (或按「ƒ 欄位公式」) 整欄自動計算；欄名可加中括號 [數量]。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬；先點某一欄的格子，再按 靠左/置中/靠右；表頭的格子可按「跨欄」合併到右邊幾欄；「格式」設定這一欄的數字格式 (千分位、小數) 或文字；「圖表」把數字畫成曲線圖、折線圖或長條圖。</span></div>
+    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow"><span id="se-hrtip">${hrTip()}</span>表頭打欄名 (例 定價、數量、金額)，任一格打 金額=數量*定價 (或按「ƒ 欄位公式」) 整欄自動計算；欄名可加中括號 [數量]。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬；先點某一欄的格子，再按 靠左/置中/靠右；表頭的格子可按「跨欄」合併到右邊幾欄；「格式」設定這一欄的數字格式 (千分位、小數) 或文字；「圖表」把數字畫成曲線圖、折線圖或長條圖；「代碼」欄打物品條碼會帶入品名、定價、單位。</span></div>
     <div class="btnrow setb" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button><button class="btn ghost" id="se-sum" type="button">Σ 合計</button><button class="btn ghost" id="se-fit" type="button">自動欄寬</button><button class="btn ghost" id="se-def" type="button">ƒ 欄位公式</button><button class="btn ghost" id="se-mg" type="button">⇔ 跨欄</button><button class="btn ghost" id="se-fm" type="button">#,## 格式</button><button class="btn ghost" id="se-ch" type="button">📈 圖表</button><button class="btn ghost" id="se-hr" type="button">表頭列數</button></div>
     <div class="btnrow setb" style="margin-bottom:8px;grid-template-columns:repeat(4,1fr)"><button class="btn ghost" data-al="l" type="button">靠左</button><button class="btn ghost" data-al="c" type="button">置中</button><button class="btn ghost" data-al="r" type="button">靠右</button><button class="btn ghost" data-al="" type="button">自動</button></div>
     <div class="gridwrap"><table class="grid" id="se-grid"></table></div>
@@ -3331,8 +3342,24 @@ async function sheetEdit(f, own, back) {
     }
     calc = sheetCalc(g, HR, isTx);
   };
+  // 代碼欄 (欄名有 代碼/條碼/貨號) : 打物品的條碼 -> 依表頭欄名帶入 品名、定價(售價)、單位、分類、部門、庫存 ; 有公式的格子不動
+  const IMAP = [[/^(品名|名稱|商品|商品名稱|品項|物品)$/, it => it.name], [/^(定價|售價|單價)$/, it => it.sp || ''], [/^單位$/, it => it.unit || ''],
+    [/^(分類|類別)$/, it => it.cat || ''], [/^部門$/, it => it.dept || ''], [/^(庫存|存量|庫存量)$/, it => it.noStock ? '' : stockOf(it.id)]];
+  const isCode = c => /代碼|條碼|貨號/.test(hn(c));
+  const fillItem = (r, c) => {
+    const code = String(g[r][c] ?? '').trim().normalize('NFKC'); if (!code) return;
+    const it = S.items.find(x => x.barcode && String(x.barcode).trim() === code);
+    if (!it) { toast(`找不到條碼 ${code} 的物品`, 2500); return; }
+    calc = sheetCalc(g, HR, isTx); let n = 0;
+    for (let cc = 0; cc < C; cc++) {
+      if (cc === c) continue; const m = IMAP.find(([re]) => re.test(hn(cc))); if (!m || calc.form(r, cc)) continue;
+      const v = m[1](it); if (v === '' || v == null) continue; g[r][cc] = String(v); n++;
+    }
+    toast(n ? `已帶入 ${it.name}` : `${it.name}：表頭沒有 品名、定價、單位 這類欄位可帶入`, 2500);
+  };
   grid.addEventListener('focusout', e => {
     const i = e.target.closest('input'); if (!i) return;
+    if (+i.dataset.r >= HR && sel && sel.r === +i.dataset.r && sel.c === +i.dataset.c && String(sel.old ?? '') !== String(g[sel.r][sel.c] ?? '') && isCode(sel.c)) fillItem(sel.r, sel.c);
     const txt = String(g[i.dataset.r][i.dataset.c] ?? '');
     if (!colDef(txt, sel && sel.r === +i.dataset.r && sel.c === +i.dataset.c ? sel : { r: +i.dataset.r, c: +i.dataset.c, old: '' }) && +i.dataset.r >= HR) {
       const miss = missName(txt); if (miss.length) toast(`找不到欄名「${miss.join('、')}」，表頭的欄名是：${hNames().join('、')}`, 6000);
@@ -3442,12 +3469,12 @@ async function sheetEdit(f, own, back) {
     let lr = -1, lc = -1; g.forEach((row, r) => row.forEach((x, c) => { if (String(x).trim() !== '') { lr = Math.max(lr, r); lc = Math.max(lc, c); } }));
     const mgs = Object.keys(mg).map(k => { const [r, c] = k.split(',').map(Number), sp = span(r, c); return sp > 1 ? { s: { r, c }, e: { r, c: c + sp - 1 } } : null; }).filter(Boolean);
     for (const m of mgs) { lr = Math.max(lr, m.s.r); lc = Math.max(lc, m.e.c); }
-    const aoa = []; for (let r = 0; r <= lr; r++) { aoa[r] = []; for (let c = 0; c <= lc; c++) aoa[r][c] = calc.val(r, c); }
+    const aoa = []; for (let r = 0; r <= lr; r++) { aoa[r] = []; for (let c = 0; c <= lc; c++) { let v = calc.val(r, c); if (r >= HR && typeof v === 'string' && v.trim() && !calc.form(r, c) && calc.isDisc(c)) try { v = discF(v); } catch (e) { } aoa[r][c] = v; } }   // 折扣欄 9折、75% 存成 0.9、0.75 , Excel 才算得出來
     let data, type;
     if (fExt(n) === 'csv') { data = new TextEncoder().encode(csv(aoa)).buffer; type = MIME.csv; }
     else {
       const ws = XLSX.utils.aoa_to_sheet(aoa.length ? aoa : [['']]);
-      for (let r = 0; r <= lr; r++) for (let c = 0; c <= lc; c++) { const fm = calc.form(r, c); if (fm) { const a = XLSX.utils.encode_cell({ r, c }); ws[a] = Object.assign(ws[a] || { t: 'n' }, { f: fm }); } }
+      for (let r = 0; r <= lr; r++) for (let c = 0; c <= lc; c++) { const fm = calc.form(r, c); if (fm) { const a = XLSX.utils.encode_cell({ r, c }); ws[a] = Object.assign(ws[a] || { t: 'n' }, { f: xlF(fm) }); } }
       ws['!cols'] = Array.from({ length: Math.max(lc + 1, 1) }, (_, c) => ({ wch: cw[c] || CW0 }));
       ws['!rows'] = Array.from({ length: HR }, (_, r) => ({ hpt: Math.round(16 * rh(r)) }));
       if (mgs.length || mgKeep.length) ws['!merges'] = [...mgs, ...mgKeep];
