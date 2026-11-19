@@ -443,7 +443,7 @@ table.grid{width:auto;border-collapse:separate;border-spacing:0;font-size:14px}
       <h2>清除資料</h2>
       <button class="btn danger" id="btnWipe">清除全部資料</button>
     </div>
-    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.6.3</p>
+    <p class="small muted" style="text-align:center"><span id="verName">家用進銷存</span> v3.6.4</p>
   </section>
 </main>
 
@@ -3243,6 +3243,7 @@ async function sheetEdit(f, own, back) {
   const covered = () => { const z = new Set(); for (const k in mg) { const [r, c] = k.split(',').map(Number); for (let i = 1; i < span(r, c); i++) z.add(r + ',' + (c + i)); } return z; };
   const wOf = (c, sp) => { let w = 0; for (let i = 0; i < sp; i++) w += colPx(c + i); return w + sp - 1; };
   let mgKeep = [], chMeta = null;
+  const hrTip = () => `第 ${HR > 1 ? '1~' + HR : '1'} 列是表頭 (粗體，按「表頭列數」可改)，點列號調整表頭字體大小；`;
   if (f) {
     try {
       const wb = XLSX.read(f.data, { type: 'array', cellFormula: true, cellStyles: true }), ws = wb.Sheets[wb.SheetNames[0]];
@@ -3264,8 +3265,8 @@ async function sheetEdit(f, own, back) {
   norm();
   openSheet(`<h3>${f ? '編輯表格' : '新表格'}</h3>
     <label>檔名</label><input id="se-name" data-ime="zh" value="${esc(name)}">
-    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow">${HR > 1 ? '第 1、2 列是表頭 (粗體)，點列號 1、2 調整表頭字體大小；' : '第 1 列是表頭；'}表頭打欄名 (例 定價、數量、金額)，任一格打 金額=數量*定價 (或按「ƒ 欄位公式」) 整欄自動計算；欄名可加中括號 [數量]。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬；先點某一欄的格子，再按 靠左/置中/靠右；表頭的格子可按「跨欄」合併到右邊幾欄；「格式」設定這一欄的數字格式 (千分位、小數) 或文字；「圖表」把數字畫成曲線圖、折線圖或長條圖。</span></div>
-    <div class="btnrow setb" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button><button class="btn ghost" id="se-sum" type="button">Σ 合計</button><button class="btn ghost" id="se-fit" type="button">自動欄寬</button><button class="btn ghost" id="se-def" type="button">ƒ 欄位公式</button><button class="btn ghost" id="se-mg" type="button">⇔ 跨欄</button><button class="btn ghost" id="se-fm" type="button">#,## 格式</button><button class="btn ghost" id="se-ch" type="button">📈 圖表</button></div>
+    <div class="row small muted" style="margin:8px 0 6px;flex-wrap:wrap"><span class="grow"><span id="se-hrtip">${hrTip()}</span>表頭打欄名 (例 定價、數量、金額)，任一格打 金額=數量*定價 (或按「ƒ 欄位公式」) 整欄自動計算；欄名可加中括號 [數量]。也可直接打 5*168、C2*D2；函數要先打 =，例 =SUM(E2:E10)。點欄名 A、B… 設定欄寬；先點某一欄的格子，再按 靠左/置中/靠右；表頭的格子可按「跨欄」合併到右邊幾欄；「格式」設定這一欄的數字格式 (千分位、小數) 或文字；「圖表」把數字畫成曲線圖、折線圖或長條圖。</span></div>
+    <div class="btnrow setb" style="margin-bottom:8px"><button class="btn ghost" id="se-ar" type="button">＋列</button><button class="btn ghost" id="se-ac" type="button">＋欄</button><button class="btn ghost" id="se-dr" type="button">－列</button><button class="btn ghost" id="se-dc" type="button">－欄</button><button class="btn ghost" id="se-sum" type="button">Σ 合計</button><button class="btn ghost" id="se-fit" type="button">自動欄寬</button><button class="btn ghost" id="se-def" type="button">ƒ 欄位公式</button><button class="btn ghost" id="se-mg" type="button">⇔ 跨欄</button><button class="btn ghost" id="se-fm" type="button">#,## 格式</button><button class="btn ghost" id="se-ch" type="button">📈 圖表</button><button class="btn ghost" id="se-hr" type="button">表頭列數</button></div>
     <div class="btnrow setb" style="margin-bottom:8px;grid-template-columns:repeat(4,1fr)"><button class="btn ghost" data-al="l" type="button">靠左</button><button class="btn ghost" data-al="c" type="button">置中</button><button class="btn ghost" data-al="r" type="button">靠右</button><button class="btn ghost" data-al="" type="button">自動</button></div>
     <div class="gridwrap"><table class="grid" id="se-grid"></table></div>
     <div id="se-chart" hidden style="margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--card)"></div>
@@ -3300,7 +3301,12 @@ async function sheetEdit(f, own, back) {
   const missName = txt => { const k = sheetCalc(g, HR, isTx); return [...String(txt).matchAll(/\[([^\]]+)\]/g)].map(x => x[1].trim()).filter(n => k.colOf(n) < 0); };
   const colDef = (txt, at) => {
     const m = /^\s*\[?([^\[\]=]+?)\]?\s*=\s*(.+)$/.exec(String(txt)); if (!m) return false;
-    const ns = hNames(), ci = sheetCalc(g, HR, isTx).colOf(m[1].trim()); if (ci < 0) return false;   // 左邊不是欄名 : 當一般內容
+    const ns = hNames(), ci = sheetCalc(g, HR, isTx).colOf(m[1].trim());
+    if (ci < 0) {   // 左邊不是欄名 : 當一般內容 ; 欄名打在表頭下面幾列 -> 提示改表頭列數
+      const nm = m[1].trim(), rr = g.findIndex((row, i) => i >= HR && i < (at ? at.r : R) && i < 5 && row.some(x => String(x ?? '').trim() === nm));
+      if (rr >= 0) toast(`「${nm}」在第 ${rr + 1} 列，請按「表頭列數」設成 ${rr + 1}，欄位公式才算得出來`, 6000);
+      return false;
+    }
     const rhs = m[2].trim(), miss = missName(rhs);
     if (at) g[at.r][at.c] = at.old ?? '';
     if (miss.length) { toast(`找不到欄名「${miss.join('、')}」，表頭的欄名是：${ns.join('、')}`, 6000); return true; }
@@ -3391,6 +3397,15 @@ async function sheetEdit(f, own, back) {
     $('#ch-png').onclick = () => chartPng($('#ch-svg svg'), ($('#se-name').value.trim() || name).replace(/\.[a-z0-9]+$/i, '') + '_圖表.png');
   }
   $('#se-ch').onclick = () => { const box = $('#se-chart'); box.hidden = !box.hidden; renderChart(); if (!box.hidden) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+  $('#se-hr').onclick = () => {   // 表頭列數 : 標題、日期、欄名各佔一列時設 3
+    const v = prompt(`表頭有幾列？(1 ~ 5，目前 ${HR})\n例：第 1 列標題、第 2 列日期、第 3 列欄名 → 3\n欄名放在表頭任一列都可以，資料和欄位公式從下一列開始`, HR); if (v === null) return;
+    const n = Math.round(Number(v)); if (!(n >= 1 && n <= 5)) { toast('請輸入 1 ~ 5'); return; }
+    HR = n; R = Math.max(R, HR + 3); norm();
+    for (const k in mg) if (+k.split(',')[0] >= HR) delete mg[k];
+    // 之前打在資料列、當時找不到欄名的「金額=數量*定價」 , 現在套用
+    for (let r = HR; r < R; r++) for (let c = 0; c < C; c++) { const t = String(g[r][c] ?? ''); if (t.includes('=') && !t.trim().startsWith('=')) colDef(t, { r, c, old: '' }); }
+    fillDown(); $('#se-hrtip').textContent = hrTip(); draw(); toast(`表頭 ${HR} 列，資料從第 ${HR + 1} 列開始`, 3000);
+  };
   $('#se-fm').onclick = () => {
     if (!sel) { toast('先點要設定的那一欄任一格'); return; }
     const c = sel.c, cur = fm[c] === 'T' ? '5' : fm[c] || '1';
